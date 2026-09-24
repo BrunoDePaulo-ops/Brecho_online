@@ -1,0 +1,14 @@
+import { Routes, Route } from "react-router-dom";
+import Home from "../pages/Home";
+
+export default function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Home />} />
+      {/* Próximas rotas virão aqui:
+          <Route path="/produto/:id" element={<DetalheProduto />} />
+          <Route path="/anunciar" element={<CriarAnuncio />} />
+      */}
+    </Routes>
+  );
+}

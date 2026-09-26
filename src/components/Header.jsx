@@ -30,9 +30,13 @@ export default function Header() {
             <Plus className="w-4 h-4" />
             Anunciar
           </Link>
-          <button className="p-2 hover:bg-gray-100 rounded-lg">
+          <Link
+            to="/meus-anuncios"
+            className="p-2 hover:bg-gray-100 rounded-lg"
+            title="Meus anúncios"
+          >
             <User className="w-5 h-5 text-gray-700" />
-          </button>
+          </Link>
         </div>
       </div>
     </header>

@@ -41,6 +41,41 @@ export async function criarProduto(produto) {
   // return data;
 }
 
+export async function excluirProduto(id) {
+  if (USE_MOCK) {
+    await delay(400);
+    const index = produtosMock.findIndex((p) => p.id === Number(id));
+    if (index !== -1) produtosMock.splice(index, 1);
+    return { sucesso: true };
+  }
+  // const { data } = await axios.delete(`${API_URL}/produtos/${id}`);
+  // return data;
+}
+
+export async function atualizarProduto(id, dados) {
+  if (USE_MOCK) {
+    await delay(500);
+    const index = produtosMock.findIndex((p) => p.id === Number(id));
+    if (index !== -1) {
+      produtosMock[index] = { ...produtosMock[index], ...dados };
+      return produtosMock[index];
+    }
+    return null;
+  }
+  // const { data } = await axios.put(`${API_URL}/produtos/${id}`, dados);
+  // return data;
+}
+
+// Lista produtos "do usuário logado" (mock: retorna todos)
+export async function listarMeusProdutos() {
+  if (USE_MOCK) {
+    await delay(400);
+    return produtosMock;
+  }
+  // const { data } = await axios.get(`${API_URL}/meus-produtos`);
+  // return data;
+}
+
 // ==================== VITRINE (com cache Redis no back) ====================
 
 export async function listarDestaques() {

@@ -1,56 +1,98 @@
-# 🛍️ Brechó Online — Front-end
+# Brechó Online
 
-Marketplace de produtos artesanais e usados (brechó online). Este repositório contém **apenas o front-end** da aplicação.
+Marketplace de produtos artesanais e usados. O repositório contém um front-end React/Vite, um back-end Django e arquivos Terraform para provisionar recursos de desenvolvimento na AWS.
 
 > **Trabalho acadêmico** — Computação em Nuvem  
-> Stack: React + Vite + Tailwind CSS
-
 ---
 
-## 📋 Sobre o projeto
+## Componentes
 
-Aplicação web onde usuários podem:
-- Navegar pela vitrine de produtos (destaques, mais procurados, todos)
-- Ver detalhes de um produto
-- Cadastrar novos anúncios (com upload de imagens)
-- (Em breve) Sistema de compra
+| Componente | Tecnologia | Diretório |
+|---|---|---|
+| Front-end | React, Vite e Tailwind CSS | `Frontend/` |
+| Back-end | Django e Django REST Framework | `Backend/` |
+| Cache local | Valkey, compatível com Redis | `docker-compose.yml` |
+| Infraestrutura AWS | Terraform e AWS | `TerraformProvisioning/` |
 
-O front-end consome uma **API REST** que será hospedada em uma instância **EC2** da AWS.  
-O back-end integra: **RDS** (dados relacionais), **S3** (imagens), **ElastiCache/Redis** (cache), **DynamoDB** (logs de CRUD) e **SNS/SQS** (processamento assíncrono de imagens).
+O Terraform configura VPC, sub-redes, grupos de segurança, duas instâncias EC2, RDS PostgreSQL, ElastiCache Valkey, DynamoDB e SNS/SQS. O módulo S3 está presente, mas desativado no arquivo principal. O provisionamento cria a infraestrutura, mas **não instala nem publica a aplicação nas EC2**.
 
----
+## Pré-requisitos
 
-## 🛠️ Tecnologias
+- Git
+- Node.js e npm (para o front-end)
+- Python 3 e `venv` (para o back-end)
+- Docker com o plugin Docker Compose (para o cache local)
+- Terraform CLI 1.5 ou superior (para a AWS)
+- AWS CLI v2 e acesso a uma conta AWS Academy (para a AWS)
 
-| Camada | Ferramenta |
-|---|---|
-| Base | React 19 |
-| Build | Vite 8 |
-| Estilo | Tailwind CSS 4 |
-| Rotas | React Router DOM |
-| HTTP | Axios |
-| Formulários | React Hook Form |
-| Upload | React Dropzone |
-| Notificações | React Hot Toast |
-| Ícones | Lucide React |
-
----
-
-## 🚀 Como rodar o projeto localmente
-
-### Pré-requisitos
-
-- **Node.js** v18+ (recomendado v20+)
-- **npm** v10+
-- **Git**
-
-Pra verificar se você tem instalado:
+Ferramentas instaladas:
 
 ```bash
-node -v
-npm -v
 git --version
+node --version
+npm --version
+python3 --version
+docker compose version
+terraform version
+aws --version
 ```
+
+Clone o repositório e entre na pasta:
+
+```bash
+git clone git@github.com:BrunoDePaulo-ops/Brecho_online.git
+cd Brecho_online
+```
+
+## Executar localmente
+
+Os comandos abaixo assumem três terminais abertos na raiz do repositório: um para o cache, um para o back-end e outro para o front-end.
+
+### 1. Iniciar o cache Valkey/Redis
+
+O Compose inicia Valkey na porta `6379` do computador e mantém os dados no volume `valkey_data`:
+
+```bash
+docker compose up -d
+docker compose ps
+```
+
+Para acompanhar os logs ou encerrar o serviço:
+
+```bash
+docker compose logs -f valkey
+docker compose down
+```
+
+Para também apagar os dados persistidos, encerre com `docker compose down -v`.
+
+### 2. Preparar e iniciar o back-end
+
+O ambiente virtual e as dependências são locais ao diretório `Backend/`:
+
+```bash
+cd Backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
+```
+
+Opcionalmente, crie um usuário para acessar o admin Django:
+
+```bash
+python manage.py createsuperuser
+```
+
+Inicie o servidor:
+
+```bash
+python manage.py runserver
+```
+
+O Django fica disponível em `http://127.0.0.1:8000/`.
+
+### 3. Iniciar o front-end
 
 Se não tiver o Node, instale via **NVM**:
 
@@ -61,41 +103,85 @@ nvm install --lts
 nvm use --lts
 ```
 
-### Passo a passo
+Em outro terminal, a partir da raiz:
 
 ```bash
-# 1. Clone o repositório
-git clone git@github.com:BrunoDePaulo-ops/Brecho_online.git
-
-# 2. Entre na pasta
-cd Brecho_online
-
-# 3. Instale as dependências
+cd Frontend
 npm install
-
-# 4. Rode o servidor de desenvolvimento
 npm run dev
 ```
 
-O projeto vai abrir em: **http://localhost:5173/**
+Abra o endereço (normalmente `http://localhost:5173/`). Neste momento o front-end usa dados mock (`USE_MOCK = true` em `Frontend/src/services/api.js`); a integração com a API ainda não está pronta.
 
----
+## Provisionar infraestrutura na AWS
 
-## 📁 Estrutura de pastas
+### 1. Configurar credenciais AWS
 
-```
-src/
-├── components/       → componentes reutilizáveis (Header, CardProduto, etc.)
-├── pages/            → telas (Home, DetalheProduto, CriarAnuncio, ...)
-├── services/         → chamadas HTTP (api.js)
-├── mocks/            → dados falsos enquanto o back-end não existe
-├── routes/           → configuração de rotas
-├── App.jsx           → componente principal
-├── main.jsx          → ponto de entrada
-└── index.css         → Tailwind CSS
+Na AWS Academy, inicie o laboratório e obtenha credenciais temporárias. Configure a AWS CLI:
+
+```bash
+aws configure
 ```
 
----
+Informe o **Access Key ID**, **Secret Access Key**, **Aws Session Token** e a região do laboratório (o Terraform usa `us-east-1` por padrão). 
+
+Credenciais da Academy expiram: atualize-as a configuração quando necessário.
+
+### 2. Configurar variáveis do Terraform
+
+Na raiz do projeto, crie `TerraformProvisioning/terraform.tfvars` (o arquivo é ignorado pelo Git) com a senha do banco e o IP público de desenvolvimento autorizado a acessar o PostgreSQL:
+
+```hcl
+aws_region     = "us-east-1"
+project_name   = "brechonline"
+vpc_cidr       = "10.0.0.0/16"
+db_password    = "SENHA"
+development_ip = "SEU_IP_PUBLICO/32"
+```
+
+Substitua `SEU_IP_PUBLICO` pelo IP público atual, por exemplo `203.0.113.10/32`. `development_ip` precisa estar em formato CIDR. Embora `aws_region` seja variável, as zonas de disponibilidade estão fixadas em `us-east-1a` e `us-east-1b`; mantenha `us-east-1` para evitar incompatibilidade.
+
+### 3. Inicializar, validar e revisar o plano
+
+```bash
+cd TerraformProvisioning
+terraform init
+terraform validate
+terraform plan
+```
+
+Revisar antes de aplicar. Se estiver correto:
+
+```bash
+terraform apply
+```
+
+O arquivo raiz expõe os IDs da VPC e das sub-redes como outputs:
+
+```bash
+terraform output
+```
+
+Os outputs de IP público das EC2 e endpoint do ElastiCache existem nos respectivos módulos, mas não são expostos como outputs raiz. A criação das EC2 também não configura SSH, não instala dependências e não inicia o front-end ou o back-end. A aplicação ainda deve ser configurada/publicada separadamente.
+
+### 4. Remover os recursos
+
+Quando terminar, confira os recursos que serão removidos e confirme a destruição:
+
+```bash
+terraform plan -destroy
+terraform destroy
+```
+
+## Estrutura do repositório
+
+```text
+Backend/                  Projeto Django e requirements.txt
+Frontend/                 Aplicação React/Vite
+TerraformProvisioning/    Configuração e módulos Terraform da AWS
+docker-compose.yml        Serviço Valkey local
+.env.example              Exemplo de variáveis de ambiente (referência)
+```
 
 ## 🔌 Modo mock vs. API real
 
@@ -165,12 +251,14 @@ git branch -d feat/nome-da-feature
 
 ### Back-end / AWS
 
+- [x] Provisionamento da Arquitetura
 - [ ] API REST na EC2
-- [ ] RDS (banco relacional)
+- [x] RDS (banco relacional)
 - [ ] S3 (armazenamento de imagens)
-- [ ] ElastiCache/Redis (cache de vitrine)
-- [ ] DynamoDB (logs de CRUD)
+- [x] ElastiCache/Redis (cache de vitrine)
+- [x] DynamoDB (logs de CRUD)
 - [ ] SNS/SQS + worker (processamento de imagens)
+- [ ] de LoadBalancing (ALS) e Auto Scaling Groups
 
 ---
 
@@ -178,7 +266,8 @@ git branch -d feat/nome-da-feature
 
 | Nome | GitHub |
 |---|---|
-| Bruno de Paulo | [@BrunoDePaulo-ops](https://github.com/BrunoDePaulo-ops) |
+| Bruno de Paulo  | [@BrunoDePaulo-ops](https://github.com/BrunoDePaulo-ops) |
+| Joélio Pinheiro | [@Joelio-Pinheiro](https://github.com/Joelio-Pinheiro)   |
 
 
 ---

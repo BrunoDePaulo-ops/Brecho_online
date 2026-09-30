@@ -1,0 +1,34 @@
+Passos:
+1. Baixar o terraform na maquina
+2. aws configure com as variaveis do Academy
+3. terraform init, plan e apply
+
+## VPC
+
+A infraestrutura em `terraform_provisioning` cria:
+
+- uma VPC `10.0.0.0/16` com DNS habilitado;
+- duas sub-redes públicas em `us-east-1a` e `us-east-1b`;
+- um Internet Gateway;
+- uma tabela de rotas pública com acesso à Internet.
+
+Para provisionar:
+
+```bash
+cd terraform_provisioning
+terraform init
+terraform plan
+terraform apply
+```
+
+Os valores padrão podem ser alterados com um arquivo `terraform.tfvars` (não versionado), por exemplo:
+
+```hcl
+aws_region          = "us-east-1"
+vpc_name            = "brechonline"
+vpc_cidr            = "10.0.0.0/16"
+availability_zones  = ["us-east-1a", "us-east-1b"]
+public_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24"]
+```
+
+Não há NAT Gateway nesta base para evitar custos recorrentes. Recursos privados e NAT podem ser adicionados quando houver workloads que precisem deles.

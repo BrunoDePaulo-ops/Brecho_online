@@ -1,4 +1,5 @@
 import { produtosMock, destaquesMock, maisProcuradosMock } from "../mocks/produtos";
+import { usuariosMock } from "../mocks/usuario";
 
 // ⚠️ IMPORTANTE: Quando o back estiver pronto, é SÓ descomentar as linhas
 // com axios e apagar as que retornam mock. O resto do front NÃO muda.
@@ -94,4 +95,25 @@ export async function listarMaisProcurados() {
   }
   // const { data } = await axios.get(`${API_URL}/vitrine/mais-procurados`);
   // return data;
+}
+
+// ==================== AUTENTICAÇÃO ====================
+
+// Retorna { token, usuario } ou lança um Error se as credenciais forem inválidas.
+export async function login(email, senha) {
+  if (USE_MOCK) {
+    await delay(600);
+    const encontrado = usuariosMock.find(
+      (u) => u.email === email && u.senha === senha
+    );
+    if (!encontrado) {
+      throw new Error("E-mail ou senha inválidos.");
+    }
+    return {
+      token: `mock-token-${encontrado.id}`,
+      usuario: { id: encontrado.id, nome: encontrado.nome, email: encontrado.email },
+    };
+  }
+  // const { data } = await axios.post(`${API_URL}/auth/login`, { email, senha });
+  // return data; // o back-end deve devolver { token, usuario }
 }

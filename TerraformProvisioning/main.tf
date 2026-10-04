@@ -50,6 +50,8 @@ module "ec2_backend" {
   instance_type     = "t3.micro"
   subnet_id         = module.network.public_subnet_ids[1]
   security_group_id = module.security.backend_security_group_id
+
+  github_token = var.github_token
 }
 
 # module "s3" {

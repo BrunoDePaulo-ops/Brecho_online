@@ -23,3 +23,11 @@ variable "security_group_id" {
   description = "Security Group da EC2"
   type        = string
 }
+
+variable "github_token" {
+  description = "Token do GitHub para o Worker clonar o repo"
+  type        = string
+  sensitive   = true
+  default     = "" 
+
+}

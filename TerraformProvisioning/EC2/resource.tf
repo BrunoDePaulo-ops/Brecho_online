@@ -36,6 +36,13 @@ resource "aws_instance" "main" {
 
   associate_public_ip_address = true
 
+  iam_instance_profile = "LabInstanceProfile"
+  key_name             = "vockey"
+  user_data            = templatefile("${path.module}/user-data.sh", {
+    github_user  = "BrunoDePaulo-ops"
+    github_token = var.github_token
+  })
+
   tags = {
     Name = "${var.project_name}-${var.role}"
   }

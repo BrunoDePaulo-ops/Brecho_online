@@ -31,4 +31,5 @@ variable "github_token" {
   description = "Token do GitHub para o Worker clonar o repo"
   type        = string
   sensitive   = true
+  default = ""
 }

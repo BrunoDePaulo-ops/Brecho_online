@@ -1,7 +1,7 @@
-output "sns_topic_arn" {
-  description = "ARN do SNS para processamento de imagens"
-  value       = aws_sns_topic.image_processing.arn
-}
+#output "sns_topic_arn" {
+#  description = "ARN do SNS para processamento de imagens"
+#  value       = aws_sns_topic.image_processing.arn
+#}
 
 output "sqs_queue_url" {
   description = "URL da fila SQS"

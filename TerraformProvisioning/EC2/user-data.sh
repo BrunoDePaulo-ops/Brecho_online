@@ -2,16 +2,16 @@
 set -e
 
 # ============ 1. Atualiza o sistema ============
-apt-get update -y
-apt-get install -y git curl
+dnf update -y
+dnf install -y git 
 
 # ============ 2. Instala Node.js 20 ============
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt-get install -y nodejs
+curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+dnf install -y nodejs
 
 # ============ 3. Clona o repositório ============
 # O token é injetado pelo Terraform via templatefile
-git clone https://${github_user}:${github_token}@github.com/BrunoDePaulo-ops/Brecho_online.git /app
+git clone -b feat/worker https://${github_user}:${github_token}@github.com/BrunoDePaulo-ops/Brecho_online.git /app
 
 # ============ 4. Configura o Worker ============
 cd /app/Worker

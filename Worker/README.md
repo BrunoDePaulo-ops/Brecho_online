@@ -11,6 +11,17 @@ Worker em **Node.js** que processa imagens de forma **assíncrona** (SQS → Wor
 5. **Sobe** as thumbnails pro **S3**
 6. **Deleta** a mensagem do **SQS**
 
+## 💧 Watermark
+
+O Worker aplica uma **marca d'água** ("BRECHÓ ONLINE") na imagem de **600px**.
+
+- **Texto:** "BRECHÓ ONLINE"
+- **Rotação:** -30° (diagonal)
+- **Cor:** branco com 50% de transparência
+- **Borda:** preta (stroke)
+- **Posição:** centro
+- **Fonte:** `DejaVu Sans` (disponível no Amazon Linux)
+
 ## 🏗️ Arquitetura
 
 ```
@@ -74,10 +85,15 @@ NODE_NO_WARNINGS=1 node src/index.js
 **O que esperar:**
 
 ```
-🚀 Worker iniciado
-📬 Fila: https://sqs.us-east-1.amazonaws.com/...
-🪣 Bucket: brechonline-products-...
+Worker iniciado
+Fila: https://sqs.us-east-1.amazonaws.com/...
+Bucket: brechonline-products-...
 ```
+### Testar o watermark
+
+```bash
+NODE_NO_WARNINGS=1 node testar-watermark.js
+xdg-open mock/teste-watermark.jpg
 
 ### 4. Testar com uma mensagem
 
@@ -190,6 +206,20 @@ aws sqs get-queue-attributes \
   --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible \
   --region us-east-1
 ```
+## 📋 Logs
+
+O Worker imprime logs detalhados durante o processamento.
+
+
+**Pra ver os logs:**
+
+```bash
+# Na EC2
+sudo pm2 logs worker
+
+# Ou o log completo
+sudo cat /root/.pm2/logs/worker-out.log
+
 
 ## ⚠️ Problemas comuns
 
@@ -200,6 +230,20 @@ aws sqs get-queue-attributes \
 | **`ExpiredToken`** | As credenciais do Academy expiraram. Renova. |
 | **`AccessDenied`** | A EC2 não tem permissão. Confere o `LabInstanceProfile`. |
 | **`Queue does not exist`** | A fila não existe. Cria com `aws sqs create-queue`. |
+| **Watermark com quadrados** | A fonte não tá instalada. Roda `sudo dnf install -y fontconfig dejavu-sans-fonts` na EC2. |
+
+## 🔌 Contrato com a API
+
+A API (Django) precisa:
+
+1. **Subir a imagem original** pro S3 com a chave `produtos/{id}/foto-original.jpg`
+2. **Publicar uma mensagem no SQS** com o formato:
+
+```json
+{
+  "produto_id": 123,
+  "s3_key": "produtos/123/foto-original.jpg"
+}
 
 ## 📌 Requisitos atendidos
 

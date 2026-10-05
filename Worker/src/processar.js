@@ -20,7 +20,7 @@ export async function aplicarWatermark(buffer) {
       <text
         x="50%"
         y="50%"
-        font-family="Arial, sans-serif"
+        font-family="DejaVu Sans, sans-serif"
         font-size="${fontSize}"
         fill="rgba(255, 255, 255, 0.5)"
         stroke="rgba(0, 0, 0, 0.3)"

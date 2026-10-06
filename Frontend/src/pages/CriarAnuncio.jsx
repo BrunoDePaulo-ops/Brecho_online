@@ -1,27 +1,25 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useDropzone } from "react-dropzone";
 import toast from "react-hot-toast";
-import { ArrowLeft, Upload, X, Plus } from "lucide-react";
-import { criarProduto } from "../services/api";
-
-const CATEGORIAS = [
-  "Decoração",
-  "Roupas",
-  "Móveis",
-  "Eletrônicos",
-  "Esportes",
-  "Livros",
-  "Instrumentos",
-  "Arte",
-  "Outros",
-];
+import { ArrowLeft, Upload, X, Plus, Save } from "lucide-react";
+import {
+  criarProduto,
+  atualizarProduto,
+  buscarProduto,
+  listarCategorias,
+} from "../services/api";
 
 export default function CriarAnuncio() {
   const navigate = useNavigate();
+  const { id } = useParams();          // ← pega o :id da URL (se existir)
+  const editando = Boolean(id);        // ← true = edição, false = criação
+
   const [imagens, setImagens] = useState([]);
   const [enviando, setEnviando] = useState(false);
+  const [categorias, setCategorias] = useState([]);
+  const [carregando, setCarregando] = useState(editando);
 
   const {
     register,
@@ -29,6 +27,35 @@ export default function CriarAnuncio() {
     formState: { errors },
     reset,
   } = useForm();
+
+  // Carrega as categorias
+  useEffect(() => {
+    listarCategorias()
+      .then(setCategorias)
+      .catch(() => toast.error("Erro ao carregar categorias."));
+  }, []);
+
+  // Se for edição, carrega o produto e preenche o form
+  useEffect(() => {
+    if (!editando) return;
+
+    buscarProduto(id)
+      .then((produto) => {
+        if (!produto) {
+          toast.error("Produto não encontrado.");
+          navigate("/meus-anuncios");
+          return;
+        }
+        reset({
+          titulo: produto.titulo,
+          descricao: produto.descricao,
+          preco: String(produto.preco).replace(".", ","),
+          categoria: produto.categoria,
+        });
+      })
+      .catch(() => toast.error("Erro ao carregar produto."))
+      .finally(() => setCarregando(false));
+  }, [editando, id, reset, navigate]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { "image/*": [] },
@@ -47,43 +74,57 @@ export default function CriarAnuncio() {
   }
 
   async function onSubmit(dados) {
-    if (imagens.length === 0) {
+    // No modo criação, exige pelo menos 1 imagem
+    if (!editando && imagens.length === 0) {
       toast.error("Adicione pelo menos uma imagem.");
       return;
     }
 
     setEnviando(true);
     try {
-      // No futuro: as imagens vão pro S3, e o produto pro RDS via API
-      const novoProduto = {
-        titulo: dados.titulo,
-        descricao: dados.descricao,
-        preco: parseFloat(
-          dados.preco
-          .replace(/\./g, "")
-          .replace(",", ".")
-        ),
-        categoria: dados.categoria,
-        vendedor: "Você (mock)",
-        imagens: imagens.map((img) => img.preview),
+      const precoNumerico = parseFloat(
+        dados.preco.replace(/\./g, "").replace(",", ".")
+      );
+
+      const produto = {
+        title: dados.titulo,
+        description: dados.descricao,
+        price: String(precoNumerico),
+        category: Number(dados.categoria),
+        status: "ACTIVE",
       };
 
-      await criarProduto(novoProduto);
-      toast.success("Anúncio publicado! (mock)");
+      if (editando) {
+        await atualizarProduto(id, produto);
+        toast.success("Anúncio atualizado!");
+      } else {
+        await criarProduto(produto);
+        toast.success("Anúncio publicado!");
+      }
+
       reset();
       setImagens([]);
-      setTimeout(() => navigate("/"), 1500);
+      setTimeout(() => navigate("/meus-anuncios"), 1500);
     } catch (erro) {
-      toast.error("Erro ao publicar anúncio.");
+      console.error(erro);
+      toast.error(editando ? "Erro ao atualizar anúncio." : "Erro ao publicar anúncio.");
     } finally {
       setEnviando(false);
     }
   }
 
+  if (carregando) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-12 text-center text-gray-500">
+        Carregando anúncio...
+      </div>
+    );
+  }
+
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
       <Link
-        to="/"
+        to="/meus-anuncios"
         className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
       >
         <ArrowLeft className="w-4 h-4" />
@@ -91,10 +132,12 @@ export default function CriarAnuncio() {
       </Link>
 
       <h1 className="text-3xl font-bold text-gray-900 mb-2">
-        Publicar anúncio
+        {editando ? "Editar anúncio" : "Publicar anúncio"}
       </h1>
       <p className="text-gray-500 mb-8">
-        Preencha os dados do produto e adicione até 5 imagens.
+        {editando
+          ? "Atualize os dados do produto."
+          : "Preencha os dados do produto e adicione até 5 imagens."}
       </p>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -126,9 +169,7 @@ export default function CriarAnuncio() {
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
           />
           {errors.descricao && (
-            <p className="text-red-500 text-sm mt-1">
-              {errors.descricao.message}
-            </p>
+            <p className="text-red-500 text-sm mt-1">{errors.descricao.message}</p>
           )}
         </div>
 
@@ -152,9 +193,7 @@ export default function CriarAnuncio() {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
             {errors.preco && (
-              <p className="text-red-500 text-sm mt-1">
-                {errors.preco.message}
-              </p>
+              <p className="text-red-500 text-sm mt-1">{errors.preco.message}</p>
             )}
           </div>
 
@@ -167,82 +206,87 @@ export default function CriarAnuncio() {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
             >
               <option value="">Selecione...</option>
-              {CATEGORIAS.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
+              {categorias.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
                 </option>
               ))}
             </select>
             {errors.categoria && (
-              <p className="text-red-500 text-sm mt-1">
-                {errors.categoria.message}
-              </p>
+              <p className="text-red-500 text-sm mt-1">{errors.categoria.message}</p>
             )}
           </div>
         </div>
 
-        {/* Upload de imagens */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Imagens * (até 5)
-          </label>
+        {/* Upload de imagens (só no modo criação) */}
+        {!editando && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Imagens * (até 5)
+            </label>
 
-          {imagens.length < 5 && (
-            <div
-              {...getRootProps()}
-              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition ${
-                isDragActive
-                  ? "border-purple-500 bg-purple-50"
-                  : "border-gray-300 hover:border-purple-400"
-              }`}
-            >
-              <input {...getInputProps()} />
-              <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-600">
-                {isDragActive
-                  ? "Solte as imagens aqui..."
-                  : "Arraste imagens ou clique para selecionar"}
-              </p>
-              <p className="text-xs text-gray-400 mt-1">
-                JPG, PNG • Máximo 5MB cada
-              </p>
-            </div>
-          )}
+            {imagens.length < 5 && (
+              <div
+                {...getRootProps()}
+                className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition ${
+                  isDragActive
+                    ? "border-purple-500 bg-purple-50"
+                    : "border-gray-300 hover:border-purple-400"
+                }`}
+              >
+                <input {...getInputProps()} />
+                <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-600">
+                  {isDragActive
+                    ? "Solte as imagens aqui..."
+                    : "Arraste imagens ou clique para selecionar"}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  JPG, PNG • Máximo 5MB cada
+                </p>
+              </div>
+            )}
 
-          {/* Preview das imagens */}
-          {imagens.length > 0 && (
-            <div className="grid grid-cols-3 md:grid-cols-5 gap-3 mt-4">
-              {imagens.map((img, index) => (
-                <div
-                  key={index}
-                  className="relative aspect-square rounded-lg overflow-hidden group"
-                >
-                  <img
-                    src={img.preview}
-                    alt={`Preview ${index + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removerImagem(index)}
-                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
+            {imagens.length > 0 && (
+              <div className="grid grid-cols-3 md:grid-cols-5 gap-3 mt-4">
+                {imagens.map((img, index) => (
+                  <div
+                    key={index}
+                    className="relative aspect-square rounded-lg overflow-hidden group"
                   >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                    <img
+                      src={img.preview}
+                      alt={`Preview ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removerImagem(index)}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-        {/* Botão publicar */}
+        {/* Botão */}
         <button
           type="submit"
           disabled={enviando}
           className="w-full flex items-center justify-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Plus className="w-5 h-5" />
-          {enviando ? "Publicando..." : "Publicar anúncio"}
+          {editando ? <Save className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+          {enviando
+            ? editando
+              ? "Salvando..."
+              : "Publicando..."
+            : editando
+              ? "Salvar alterações"
+              : "Publicar anúncio"}
         </button>
       </form>
     </main>

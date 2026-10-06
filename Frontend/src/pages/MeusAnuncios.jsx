@@ -34,7 +34,7 @@ export default function MeusAnuncios() {
 
   function handleEditar(id) {
     // No futuro: navigate(`/anunciar/${id}`) — tela de edição
-    toast("Edição será implementada em breve.", { icon: "🚧" });
+    navigate(`/anunciar/${id}`);
   }
 
   if (carregando) {

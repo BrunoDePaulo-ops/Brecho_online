@@ -54,7 +54,12 @@ export async function criarProduto(produto) {
     produtosMock.push(novo);
     return novo;
   }
-  const { data } = await axios.post(`${API_URL}/products/`, produto);
+  const auth = JSON.parse(localStorage.getItem("brecho_auth") || "{}");
+  const { data } = await axios.post(`${API_URL}/products/`, produto, {
+    headers: {
+      Authorization: `Bearer ${auth.token}`,
+    },
+  });
   return adaptarProduto(data);
 }
 
@@ -79,7 +84,12 @@ export async function atualizarProduto(id, dados) {
     }
     return null;
   }
-  const { data } = await axios.put(`${API_URL}/products/${id}`, dados);
+  const auth = JSON.parse(localStorage.getItem("brecho_auth") || "{}");
+  const { data } = await axios.put(`${API_URL}/products/${id}/`, dados, {
+    headers: {
+      Authorization: `Bearer ${auth.token}`,
+    },
+  });
   return adaptarProduto(data);
 }
 
@@ -91,6 +101,12 @@ export async function listarMeusProdutos() {
   }
   // const { data } = await axios.get(`${API_URL}/meus-produtos`);
   // return data;
+  //return await listarProdutos();
+  const produtos = await listarProdutos();
+  const auth = JSON.parse(localStorage.getItem("brecho_auth") || "{}");
+  const usuarioId = auth.usuario?.id;
+  if (!usuarioId) return [];
+  return produtos.filter((p) => p.vendedor === usuarioId);
 }
 
 // ==================== VITRINE (com cache Redis no back) ====================
@@ -141,6 +157,26 @@ export async function login(email, senha) {
       usuario: { id: encontrado.id, nome: encontrado.nome, email: encontrado.email },
     };
   }
-  const { data } = await axios.post(`${API_URL}/token/`, { username , password: senha, });
-  return  { token: data.access, refresh: data.refresh, };
+
+  const { data } = await axios.post(`${API_URL}/token/`, {
+    username: email,
+    password: senha,
+  });
+
+  const { data: usuarios } = await axios.get(`${API_URL}/users/`, {
+    headers: { Authorization: `Bearer ${data.access}` },
+  });
+
+  const usuario = usuarios.find((u) => u.username === email) || null;
+
+    return {
+    token: data.access,
+    refresh: data.refresh,
+    usuario,
+  };
+}
+
+export async function cadastrarUsuario(dados) {
+  const { data } = await axios.post(`${API_URL}/users/`, dados);
+  return data;
 }

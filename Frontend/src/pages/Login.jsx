@@ -118,7 +118,10 @@ export default function Login() {
         </form>
 
         <p className="text-xs text-gray-400 text-center mt-6">
-          Modo mock: use demo@brecho.com / 123456
+          Não tem conta?{" "}
+          <Link to="/cadastro" className="text-purple-600 hover:underline">
+            Cadastre-se
+          </Link>
         </p>
       </div>
 

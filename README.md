@@ -275,3 +275,7 @@ git branch -d feat/nome-da-feature
 ## 📄 Licença
 
 Projeto acadêmico — sem fins comerciais.
+
+
+
+psql -h SEU_RDS_ENDPOINT -p 5432 -U marketplace -d marketplace

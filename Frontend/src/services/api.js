@@ -33,7 +33,7 @@ export async function listarProdutos() {
     await delay(500);
     return produtosMock;
   }
-  const { data } = await axios.get(`${API_URL}/products`);
+  const { data } = await axios.get(`${API_URL}/products/`);
   return data.map(adaptarProduto);
 }
 
@@ -43,7 +43,7 @@ export async function buscarProduto(id) {
     const produto = produtosMock.find((p) => p.id === Number(id));
     return produto || null;
   }
-  const { data } = await axios.get(`${API_URL}/products/${id}`);
+  const { data } = await axios.get(`${API_URL}/products/${id}/`);
   return adaptarProduto(data);
 }
 

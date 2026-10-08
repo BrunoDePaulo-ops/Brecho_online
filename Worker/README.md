@@ -2,6 +2,8 @@
 
 Worker em **Node.js** que processa imagens de forma **assíncrona** (SQS → Worker → S3).
 
+---
+
 ## 🎯 O que ele faz
 
 1. **Lê** uma mensagem do **SQS** (com o caminho da imagem no S3)
@@ -11,26 +13,42 @@ Worker em **Node.js** que processa imagens de forma **assíncrona** (SQS → Wor
 5. **Sobe** as thumbnails pro **S3**
 6. **Deleta** a mensagem do **SQS**
 
+---
+
 ## 💧 Watermark
 
 O Worker aplica uma **marca d'água** ("BRECHÓ ONLINE") na imagem de **600px**.
 
-- **Texto:** "BRECHÓ ONLINE"
-- **Rotação:** -30° (diagonal)
-- **Cor:** branco com 50% de transparência
-- **Borda:** preta (stroke)
-- **Posição:** centro
-- **Fonte:** `DejaVu Sans` (disponível no Amazon Linux)
+| Propriedade | Valor |
+|---|---|
+| **Texto** | "BRECHÓ ONLINE" |
+| **Rotação** | -30° (diagonal) |
+| **Cor** | branco com 50% de transparência |
+| **Borda** | preta (stroke) |
+| **Posição** | centro |
+| **Fonte** | `DejaVu Sans` (disponível no Amazon Linux) |
+
+---
 
 ## 🏗️ Arquitetura
 
 ```
-API → SNS/SQS → Worker → S3
+Front → API (Django) → PostgreSQL (dados)
+                    → S3 (imagem original)
+                    → SQS (mensagem)
+                        ↓
+                    Worker (Node.js)
+                        ↓
+                    S3 (thumbs)
 ```
 
-- **API** (Django): sobe a imagem original pro S3 e publica no SQS
+- **Front** (React): envia a imagem + dados
+- **API** (Django): salva os dados no PostgreSQL, sobe a original pro S3 e publica no SQS
 - **Worker** (Node.js): lê do SQS, processa e sobe as thumbs pro S3
-- **S3**: armazena as imagens
+- **S3**: armazena as imagens (original + thumbs)
+- **PostgreSQL**: guarda os dados estruturados + referências (s3_key)
+
+---
 
 ## 📁 Estrutura
 
@@ -48,6 +66,8 @@ Worker/
 └── README.md
 ```
 
+---
+
 ## 🚀 Como rodar localmente
 
 ### Pré-requisitos
@@ -56,6 +76,9 @@ Worker/
 - **AWS CLI** configurada com credenciais do Academy
 - **Bucket S3** criado
 - **Fila SQS** criada
+- **API Django** rodando (com `boto3` instalado)
+
+---
 
 ### 1. Instalar dependências
 
@@ -64,17 +87,23 @@ cd Worker
 npm install
 ```
 
+---
+
 ### 2. Criar o `.env`
 
 ```bash
 code .env
 ```
 
+**Conteúdo do `.env`:**
+
 ```
 AWS_REGION=us-east-1
 SQS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/SEU_ACCOUNT_ID/NOME_DA_FILA
 S3_BUCKET_NAME=NOME_DO_BUCKET
 ```
+
+---
 
 ### 3. Rodar o Worker
 
@@ -85,17 +114,25 @@ NODE_NO_WARNINGS=1 node src/index.js
 **O que esperar:**
 
 ```
-Worker iniciado
-Fila: https://sqs.us-east-1.amazonaws.com/...
-Bucket: brechonline-products-...
+🚀 Worker iniciado
+📬 Fila: https://sqs.us-east-1.amazonaws.com/...
+🪣 Bucket: brechonline-products-...
 ```
-### Testar o watermark
+
+---
+
+### 4. Testar o watermark (opcional)
 
 ```bash
 NODE_NO_WARNINGS=1 node testar-watermark.js
 xdg-open mock/teste-watermark.jpg
+```
 
-### 4. Testar com uma mensagem
+**O que vai ver:** a imagem com o texto "BRECHÓ ONLINE" em diagonal.
+
+---
+
+### 5. Testar com uma mensagem
 
 **Em outro terminal:**
 
@@ -125,7 +162,9 @@ aws sqs send-message \
 ✅ Mensagem deletada do SQS
 ```
 
-### 5. Confirmar as thumbs no S3
+---
+
+### 6. Confirmar as thumbs no S3
 
 ```bash
 aws s3 ls s3://SEU_BUCKET/produtos/999/ --region us-east-1
@@ -138,6 +177,8 @@ foto-original.jpg
 thumb_300.jpg       ← criada pelo Worker
 thumb_600.jpg       ← criada pelo Worker (com watermark)
 ```
+
+---
 
 ## ☁️ Como rodar na EC2
 
@@ -179,20 +220,28 @@ sudo pm2 list
 sudo pm2 logs worker
 ```
 
-## 🐛 Debug
+---
 
-### Ver logs
+## 📋 Logs
+
+O Worker imprime logs detalhados durante o processamento.
+
+**Pra ver os logs:**
 
 ```bash
 # Na EC2
 sudo pm2 logs worker
 
-# Ver log completo
+# Ou o log completo
 sudo cat /root/.pm2/logs/worker-out.log
 sudo cat /root/.pm2/logs/worker-error.log
 ```
 
-### Reiniciar o Worker
+---
+
+## 🐛 Debug
+
+### Reiniciar o Worker (na EC2)
 
 ```bash
 sudo pm2 restart worker
@@ -206,20 +255,8 @@ aws sqs get-queue-attributes \
   --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible \
   --region us-east-1
 ```
-## 📋 Logs
 
-O Worker imprime logs detalhados durante o processamento.
-
-
-**Pra ver os logs:**
-
-```bash
-# Na EC2
-sudo pm2 logs worker
-
-# Ou o log completo
-sudo cat /root/.pm2/logs/worker-out.log
-
+---
 
 ## ⚠️ Problemas comuns
 
@@ -231,6 +268,8 @@ sudo cat /root/.pm2/logs/worker-out.log
 | **`AccessDenied`** | A EC2 não tem permissão. Confere o `LabInstanceProfile`. |
 | **`Queue does not exist`** | A fila não existe. Cria com `aws sqs create-queue`. |
 | **Watermark com quadrados** | A fonte não tá instalada. Roda `sudo dnf install -y fontconfig dejavu-sans-fonts` na EC2. |
+
+---
 
 ## 🔌 Contrato com a API
 
@@ -244,6 +283,11 @@ A API (Django) precisa:
   "produto_id": 123,
   "s3_key": "produtos/123/foto-original.jpg"
 }
+```
+
+**O Worker lê essa mensagem**, baixa a imagem do S3, processa e sobe as thumbs pro S3.
+
+---
 
 ## 📌 Requisitos atendidos
 

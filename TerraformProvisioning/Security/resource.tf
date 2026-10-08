@@ -19,6 +19,16 @@ resource "aws_security_group" "backend" {
   }
 }
 
+resource "aws_security_group" "worker" {
+  name        = "${var.project_name}-worker-sg"
+  description = "Security Group do worker"
+  vpc_id      = var.vpc_id
+
+  tags = {
+    Name = "${var.project_name}-worker-sg"
+  }
+}
+
 resource "aws_security_group" "rds" {
   name        = "${var.project_name}-rds-sg"
   description = "Security Group do banco RDS"
@@ -59,6 +69,32 @@ resource "aws_vpc_security_group_ingress_rule" "backend" {
   to_port     = 8080
 }
 
+resource "aws_vpc_security_group_ingress_rule" "frontend_ssh" {
+  security_group_id = aws_security_group.frontend.id
+
+  cidr_ipv4   = var.development_ip
+  from_port   = 22
+  ip_protocol = "tcp"
+  to_port     = 22
+}
+
+resource "aws_vpc_security_group_ingress_rule" "backend_ssh" {
+  security_group_id = aws_security_group.backend.id
+
+  cidr_ipv4   = var.development_ip
+  from_port   = 22
+  ip_protocol = "tcp"
+  to_port     = 22
+}
+
+resource "aws_vpc_security_group_ingress_rule" "worker_ssh" { # TODO: retirar o SSH
+  security_group_id = aws_security_group.worker.id
+
+  cidr_ipv4   = var.development_ip
+  from_port   = 22
+  ip_protocol = "tcp"
+  to_port     = 22
+}
 // Aceita conexões do Security Group do EC2 para o RDS e ElastiCache
 resource "aws_vpc_security_group_ingress_rule" "rds_postgres" {
   security_group_id = aws_security_group.rds.id
@@ -115,4 +151,10 @@ resource "aws_vpc_security_group_egress_rule" "elasticache_all" {
 
   cidr_ipv4   = "0.0.0.0/0"
   ip_protocol = "-1"
+}
+
+resource "aws_vpc_security_group_egress_rule" "worker_all" {
+  security_group_id = aws_security_group.worker.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "-1"
 }

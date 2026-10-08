@@ -18,9 +18,9 @@ cd /app/Worker
 
 # Cria o .env
 cat > .env <<EOF
-AWS_REGION=us-east-1
-SQS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/692366918619/brechonline-image-processing
-S3_BUCKET_NAME=brechonline-products-692366918619
+AWS_REGION=${aws_region}
+SQS_QUEUE_URL=${sqs_queue_url}
+S3_BUCKET_NAME=${s3_bucket_name}
 EOF
 
 # Instala dependências

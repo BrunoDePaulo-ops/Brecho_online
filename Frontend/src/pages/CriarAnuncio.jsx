@@ -98,7 +98,7 @@ export default function CriarAnuncio() {
         await atualizarProduto(id, produto);
         toast.success("Anúncio atualizado!");
       } else {
-        await criarProduto(produto);
+        await criarProduto(produto, imagens);
         toast.success("Anúncio publicado!");
       }
 

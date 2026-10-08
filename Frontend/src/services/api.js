@@ -47,7 +47,7 @@ export async function buscarProduto(id) {
   return adaptarProduto(data);
 }
 
-export async function criarProduto(produto) {
+export async function criarProduto(produto, imagens = []) {
   if (USE_MOCK) {
     await delay(800);
     const novo = { ...produto, id: Date.now() };
@@ -55,9 +55,22 @@ export async function criarProduto(produto) {
     return novo;
   }
   const auth = JSON.parse(localStorage.getItem("brecho_auth") || "{}");
-  const { data } = await axios.post(`${API_URL}/products/`, produto, {
+  const formData = new FormData();
+  
+  formData.append("title", produto.title);
+  formData.append("description", produto.description);
+  formData.append("price", produto.price);
+  formData.append("category", produto.category);
+  formData.append("status", produto.status || "ACTIVE");
+
+  imagens.forEach((img) => {
+    formData.append("images", img.arquivo);
+  });
+
+  const { data } = await axios.post(`${API_URL}/products/`, formData, {
     headers: {
       Authorization: `Bearer ${auth.token}`,
+      "Content-Type": "multipart/form-data",
     },
   });
   return adaptarProduto(data);

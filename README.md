@@ -1,109 +1,68 @@
-# Brechó Online
+# Como testar o fluxo completo
 
-Marketplace de produtos artesanais e usados. O repositório contém um front-end React/Vite, um back-end Django e arquivos Terraform para provisionar recursos de desenvolvimento na AWS.
+Este guia explica como testar a **integração completa** do brechó:
 
-> **Trabalho acadêmico** — Computação em Nuvem  
+**Front (React) → API (Django) → PostgreSQL + S3 + SQS → Worker (Node.js) → S3**
+
 ---
 
-## Componentes
+## 🏗️ Fluxo
 
-| Componente | Tecnologia | Diretório |
-|---|---|---|
-| Front-end | React, Vite e Tailwind CSS | `Frontend/` |
-| Back-end | Django e Django REST Framework | `Backend/` |
-| Cache local | Valkey, compatível com Redis | `docker-compose.yml` |
-| Infraestrutura AWS | Terraform e AWS | `TerraformProvisioning/` |
+```
+Front (React) → API (Django) → PostgreSQL (dados)
+                            → S3 (imagem original)
+                            → SQS (mensagem)
+                                ↓
+                            Worker (Node.js)
+                                ↓
+                            S3 (thumbs)
+```
 
-O Terraform configura VPC, sub-redes, grupos de segurança, duas instâncias EC2, RDS PostgreSQL, ElastiCache Valkey, DynamoDB e SNS/SQS. O módulo S3 está presente, mas desativado no arquivo principal. O provisionamento cria a infraestrutura, mas **não instala nem publica a aplicação nas EC2**.
+1. **Front** envia a imagem + dados
+2. **API** salva os dados no PostgreSQL, sobe a original pro S3 e publica no SQS
+3. **Worker** lê do SQS, processa (resize + watermark) e sobe as thumbs pro S3
+4. **PostgreSQL** guarda os dados estruturados + referências (s3_key)
+
+---
 
 ## Pré-requisitos
 
-- Git
-- Node.js e npm (para o front-end)
-- Python 3 e `venv` (para o back-end)
-- Docker com o plugin Docker Compose (para o cache local)
-- Terraform CLI 1.5 ou superior (para a AWS)
-- AWS CLI v2 e acesso a uma conta AWS Academy (para a AWS)
+- ✅ **Node.js** 20+
+- ✅ **Python** 3 + `venv`
+- ✅ **PostgreSQL** rodando localmente
+- ✅ **AWS CLI** configurada (credenciais do Academy)
+- ✅ **Bucket S3** criado
+- ✅ **Fila SQS** criada
 
-Ferramentas instaladas:
+---
 
-```bash
-git --version
-node --version
-npm --version
-python3 --version
-docker compose version
-terraform version
-aws --version
-```
+## Passo 1 — Prepara a API
 
-Clone o repositório e entre na pasta:
-
-```bash
-git clone git@github.com:BrunoDePaulo-ops/Brecho_online.git
-cd Brecho_online
-```
-
-## Executar localmente
-
-Os comandos abaixo assumem três terminais abertos na raiz do repositório: um para o cache, um para o back-end e outro para o front-end.
-
-### 1. Iniciar o cache Valkey/Redis
-
-O Compose inicia Valkey na porta `6379` do computador e mantém os dados no volume `valkey_data`:
-
-```bash
-docker compose up -d
-docker compose ps
-```
-
-Para acompanhar os logs ou encerrar o serviço:
-
-```bash
-docker compose logs -f valkey
-docker compose down
-```
-
-Para também apagar os dados persistidos, encerre com `docker compose down -v`.
-
-### 2. Preparar e iniciar o back-end
-
-O ambiente virtual e as dependências são locais ao diretório `Backend/`:
+**Terminal 1:**
 
 ```bash
 cd Backend
-python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python manage.py migrate
-```
-
-Opcionalmente, crie um usuário para acessar o admin Django:
-
-```bash
-python manage.py createsuperuser
-```
-
-Inicie o servidor:
-
-```bash
+python manage.py createsuperuser   # (se não tiver usuário)
 python manage.py runserver
 ```
 
-O Django fica disponível em `http://127.0.0.1:8000/`.
+**A API fica em:** `http://localhost:8000/`
 
-### 3. Iniciar o front-end
+**O que esperar:**
 
-Se não tiver o Node, instale via **NVM**:
-
-```bash
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh | bash
-source ~/.bashrc
-nvm install --lts
-nvm use --lts
+```
+Starting development server at http://127.0.0.1:8000/
+Quit the server with CONTROL-C.
 ```
 
-Em outro terminal, a partir da raiz:
+---
+
+## Passo 2 — Prepara o front
+
+**Terminal 2:**
 
 ```bash
 cd Frontend
@@ -111,171 +70,222 @@ npm install
 npm run dev
 ```
 
-Abra o endereço (normalmente `http://localhost:5173/`). Neste momento o front-end usa dados mock (`USE_MOCK = true` em `Frontend/src/services/api.js`); a integração com a API ainda não está pronta.
+**O front fica em:** `http://localhost:5173/`
 
-## Provisionar infraestrutura na AWS
+**O que esperar:**
 
-### 1. Configurar credenciais AWS
-
-Na AWS Academy, inicie o laboratório e obtenha credenciais temporárias. Configure a AWS CLI:
-
-```bash
-aws configure
 ```
+  VITE v8.3.1  ready in 300 ms
 
-Informe o **Access Key ID**, **Secret Access Key**, **Aws Session Token** e a região do laboratório (o Terraform usa `us-east-1` por padrão). 
-
-Credenciais da Academy expiram: atualize-as a configuração quando necessário.
-
-### 2. Configurar variáveis do Terraform
-
-Na raiz do projeto, crie `TerraformProvisioning/terraform.tfvars` (o arquivo é ignorado pelo Git) com a senha do banco e o IP público de desenvolvimento autorizado a acessar o PostgreSQL:
-
-```hcl
-aws_region     = "us-east-1"
-project_name   = "brechonline"
-vpc_cidr       = "10.0.0.0/16"
-db_password    = "SENHA"
-development_ip = "SEU_IP_PUBLICO/32"
+  ➜  Local:   http://localhost:5173/
 ```
-
-Substitua `SEU_IP_PUBLICO` pelo IP público atual, por exemplo `203.0.113.10/32`. `development_ip` precisa estar em formato CIDR. Embora `aws_region` seja variável, as zonas de disponibilidade estão fixadas em `us-east-1a` e `us-east-1b`; mantenha `us-east-1` para evitar incompatibilidade.
-
-### 3. Inicializar, validar e revisar o plano
-
-```bash
-cd TerraformProvisioning
-terraform init
-terraform validate
-terraform plan
-```
-
-Revisar antes de aplicar. Se estiver correto:
-
-```bash
-terraform apply
-```
-
-O arquivo raiz expõe os IDs da VPC e das sub-redes como outputs:
-
-```bash
-terraform output
-```
-
-Os outputs de IP público das EC2 e endpoint do ElastiCache existem nos respectivos módulos, mas não são expostos como outputs raiz. A criação das EC2 também não configura SSH, não instala dependências e não inicia o front-end ou o back-end. A aplicação ainda deve ser configurada/publicada separadamente.
-
-### 4. Remover os recursos
-
-Quando terminar, confira os recursos que serão removidos e confirme a destruição:
-
-```bash
-terraform plan -destroy
-terraform destroy
-```
-
-## Estrutura do repositório
-
-```text
-Backend/                  Projeto Django e requirements.txt
-Frontend/                 Aplicação React/Vite
-TerraformProvisioning/    Configuração e módulos Terraform da AWS
-docker-compose.yml        Serviço Valkey local
-.env.example              Exemplo de variáveis de ambiente (referência)
-```
-
-## 🔌 Modo mock vs. API real
-
-O arquivo `src/services/api.js` tem uma constante chamada **`USE_MOCK`**:
-
-```js
-const USE_MOCK = true; // 👈 true = usa dados falsos | false = chama API real
-```
-
-- **`USE_MOCK = true`** → o front usa dados falsos (`src/mocks/`) — **não precisa do back-end rodando**
-- **`USE_MOCK = false`** → o front chama a API real na EC2
-
-Enquanto o back-end não estiver pronto, **mantenha `USE_MOCK = true`**.
 
 ---
 
-## 🌿 Fluxo de trabalho com Git
+## Passo 3 — Prepara o Worker
 
-**Nunca commite direto na `main`.** Use branches por feature:
+**Terminal 3:**
 
 ```bash
-# 1. Antes de começar uma feature, crie uma branch
-git checkout -b feat/nome-da-feature
-
-# 2. Trabalhe, commite normalmente
-git add .
-git commit -m "feat: descrição do que foi feito"
-
-# 3. Suba a branch pro GitHub
-git push -u origin feat/nome-da-feature
-
-# 4. Abra um Pull Request no GitHub
-# 5. Depois do merge, apague a branch local
-git checkout main
-git pull
-git branch -d feat/nome-da-feature
+cd Worker
+npm install
+NODE_NO_WARNINGS=1 node src/index.js
 ```
 
-### Padrão de mensagens de commit
+**O Worker fica ouvindo a fila SQS.**
 
-| Prefixo | Uso |
+**O que esperar:**
+
+```
+🚀 Worker iniciado
+📬 Fila: https://sqs.us-east-1.amazonaws.com/...
+🪣 Bucket: brechonline-products-...
+```
+
+---
+
+## Passo 4 — Testa o fluxo completo
+
+### 4.1 — Faz login
+
+**No navegador:**
+
+```
+http://localhost:5173/login
+```
+
+**Preenche:**
+- **E-mail:** `ana@email.com` (ou o que você criou)
+- **Senha:** `Senha123!`
+
+**O que esperar:**
+- ✅ Redireciona pra Home
+- ✅ Toast "Login realizado!"
+
+### 4.2 — Cria um anúncio
+
+**No navegador:**
+
+```
+http://localhost:5173/anunciar
+```
+
+**Preenche:**
+- **Título:** `Vaso artesanal`
+- **Descrição:** `Feito à mão`
+- **Preço:** `89,90`
+- **Categoria:** (escolhe)
+- **Imagem:** (arrasta uma do PC)
+
+**Clica em "Publicar anúncio".**
+
+**O que esperar:**
+- ✅ Toast "Anúncio publicado!"
+- ✅ Redireciona pra Home
+- ✅ O produto aparece na Home
+
+### 4.3 — Vê o Worker processar
+
+**No terminal do Worker:**
+
+```
+📦 Mensagem recebida: { produto_id: ..., s3_key: "produtos/.../foto-original.jpg" }
+⬇️ Baixando do S3...
+✅ Baixado: ... bytes
+🖼️ Redimensionando...
+✅ Resize: 300px = ... bytes | 600px = ... bytes
+⬆️ Subindo pro S3...
+✅ Thumbnails salvas no S3
+🗑️ Deletando do SQS...
+✅ Mensagem deletada do SQS
+```
+
+### 4.4 — Confirma as thumbs no S3
+
+```bash
+aws s3 ls s3://brechonline-products-692366918619/produtos/ --recursive --region us-east-1
+```
+
+**O que esperar:**
+
+```
+produtos/{uuid}/foto-original.jpg
+produtos/{uuid}/thumb_300.jpg       ← criada pelo Worker
+produtos/{uuid}/thumb_600.jpg       ← criada pelo Worker (com watermark)
+```
+
+### 4.5 — Confirma no PostgreSQL (Django admin)
+
+```
+http://localhost:8000/admin/
+```
+
+**Login:** `bruno` / `Senha123!`
+
+**O que ver:**
+
+- ✅ **Users** — os usuários criados
+- ✅ **Products** — os produtos criados
+- ✅ **Categories** — as categorias
+
+---
+
+## ✅ Checklist do fluxo
+
+- [ ] **API** rodando em `localhost:8000`
+- [ ] **Front** rodando em `localhost:5173`
+- [ ] **Worker** rodando
+- [ ] **Login** funcionando
+- [ ] **Criar anúncio** funcionando
+- [ ] **Worker** processou a mensagem
+- [ ] **Thumbs** criadas no S3
+- [ ] **Produto** aparece no admin do Django
+- [ ] **Produto** aparece na Home
+
+---
+
+## ⚠️ Problemas comuns
+
+| Problema | Solução |
 |---|---|
-| `feat:` | Nova funcionalidade |
-| `fix:` | Correção de bug |
-| `chore:` | Tarefas de setup/manutenção |
-| `docs:` | Documentação |
-| `style:` | Formatação (sem mudança de lógica) |
-| `refactor:` | Refatoração (sem mudança de comportamento) |
+| **`ExpiredToken`** | Renova as credenciais no Academy |
+| **`QueueDoesNotExist`** | Cria a fila SQS ou corrige o `.env` do Worker |
+| **`NoSuchBucket`** | Cria o bucket S3 ou corrige o `.env` |
+| **`AccessDenied`** | Confere se o bucket tá certo no `.env` |
+| **CORS policy** | Confere o `CORS_ALLOWED_ORIGINS` no `settings.py` |
+| **`ModuleNotFoundError: boto3`** | Roda `pip install -r requirements.txt` |
+| **`novoProduto is not defined`** | Confere o `onSubmit` no `CriarAnuncio.jsx` |
+| **401 Unauthorized** | Token expirou. Faz login de novo |
+| **415 Unsupported Media** | Confere se o `api.js` manda `multipart/form-data` |
+| **500 Internal Server Error** | Olha o terminal da API (traceback) |
+| **Watermark com quadrados** | Instala fontes na EC2: `sudo dnf install -y fontconfig dejavu-sans-fonts` |
 
 ---
 
-## 📌 Status do desenvolvimento
+## 🔌 Serviços AWS usados
 
-### Front-end
-
-- [x] Setup do projeto (Vite + React + Tailwind)
-- [x] Estrutura de pastas
-- [x] Mock de produtos
-- [x] Camada de serviço (api.js com USE_MOCK)
-- [x] Header
-- [x] Card de produto
-- [x] Home (vitrine com destaques, mais procurados e todos)
-- [ ] Detalhe do produto
-- [ ] Criar anúncio (formulário + upload)
-- [ ] Integração com API real
-- [ ] Polling do status de processamento
-
-### Back-end / AWS
-
-- [x] Provisionamento da Arquitetura
-- [ ] API REST na EC2
-- [x] RDS (banco relacional)
-- [ ] S3 (armazenamento de imagens)
-- [x] ElastiCache/Redis (cache de vitrine)
-- [x] DynamoDB (logs de CRUD)
-- [ ] SNS/SQS + worker (processamento de imagens)
-- [ ] de LoadBalancing (ALS) e Auto Scaling Groups
+| Serviço | O que faz | Status |
+|---|---|---|
+| **EC2** | Roda a API + Worker | (quando subir) |
+| **RDS** | Banco relacional | (quando subir) |
+| **S3** | Armazena imagens (original + thumbs) | ✅ |
+| **SQS** | Fila de mensagens | ✅ |
+| **DynamoDB** | Logs de CRUD | (quando subir) |
+| **ElastiCache** | Cache de vitrine | (quando subir) |
 
 ---
 
-## 👥 Equipe
+## 📌 Requisitos atendidos
 
-| Nome | GitHub |
+| Requisito | Como é atendido |
 |---|---|
-| Bruno de Paulo  | [@BrunoDePaulo-ops](https://github.com/BrunoDePaulo-ops) |
-| Joélio Pinheiro | [@Joelio-Pinheiro](https://github.com/Joelio-Pinheiro)   |
-
+| **1. Interface Web na EC2** | Front (React) + API (Django) |
+| **2. Dados no RDS** | PostgreSQL (local) / RDS (produção) |
+| **3. Arquivos no S3** | Imagens (original + thumbs) |
+| **4. ElastiCache (cache)** | Cache de vitrine (destaques, mais procurados) |
+| **5. Log de CRUD no DynamoDB** | Logs de criar/editar/excluir |
+| **6. SNS/SQS para desacoplamento** | Fila SQS + Worker |
 
 ---
 
-## 📄 Licença
+## 🐛 Debug rápido
 
-Projeto acadêmico — sem fins comerciais.
+### Verificar se a API tá rodando
 
+```bash
+curl http://localhost:8000/api/products/
+```
 
+**O que esperar:** JSON com a lista de produtos (ou `[]` se vazio).
 
-psql -h SEU_RDS_ENDPOINT -p 5432 -U marketplace -d marketplace
+### Verificar se a fila SQS tem mensagens
+
+```bash
+aws sqs get-queue-attributes \
+  --queue-url https://sqs.us-east-1.amazonaws.com/692366918619/brechonline-image-processing \
+  --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesNotVisible \
+  --region us-east-1
+```
+
+**O que esperar:**
+
+- **`Messages: 1, NotVisible: 0`** → mensagem na fila (Worker não pegou)
+- **`Messages: 0, NotVisible: 0`** → fila vazia (Worker processou)
+- **`Messages: 0, NotVisible: 1`** → Worker pegou, mas não terminou
+
+### Ver o log do Worker
+
+```bash
+# No terminal do Worker
+# (Ctrl + C pra parar)
+NODE_NO_WARNINGS=1 node src/index.js
+```
+
+---
+
+## 📞 Contato
+
+Se der problema, chama no grupo do trabalho:
+
+- **Bruno** — front + worker
+- **Joélio** — backend + infra

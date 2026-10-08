@@ -50,3 +50,24 @@ class Product(models.Model):
 
     def __str__(self):
         return self.title
+    
+class ProductImage(models.Model):
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="images",
+    )
+
+    s3_key = models.CharField(max_length=1024)
+    original_filename = models.CharField(max_length=255)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.s3_key

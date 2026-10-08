@@ -4,7 +4,7 @@ data "aws_ami" "amazon_linux" {
   owners = ["amazon"]
 
   filter {
-    name   = "name" # TODO: Testar outros  filtros
+    name   = "name"
     values = ["al2023-ami-*-x86_64"]
   }
 
@@ -38,11 +38,9 @@ resource "aws_instance" "main" {
 
   iam_instance_profile = "LabInstanceProfile"
   key_name             = "vockey"
-  user_data            = templatefile("${path.module}/user-data.sh", {
-    github_user  = "BrunoDePaulo-ops"
-    github_token = var.github_token
-  })
-
+  user_data = var.user_data
+  
+  user_data_replace_on_change = true
   tags = {
     Name = "${var.project_name}-${var.role}"
   }

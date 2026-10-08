@@ -65,6 +65,7 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "API para marketplace de produtos artesanais e usados",
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
 }
 
 MIDDLEWARE = [
@@ -99,17 +100,36 @@ WSGI_APPLICATION = 'brecho.wsgi.application'
 
 
 # Database
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": env("DB_NAME"),
-        "USER": env("DB_USER"),
-        "PASSWORD": env("DB_PASSWORD"),
-        "HOST": env("DB_HOST"),
-        "PORT": env("DB_PORT", default="5432"),
-    }
-}
+# DB_ENGINE = env("DB_ENGINE", default="sqlite")
 
+# if DB_ENGINE == "postgresql":
+#     DATABASES = {
+#         "default": {
+#             "ENGINE": "django.db.backends.postgresql",
+#             "NAME": env("DB_NAME"),
+#             "USER": env("DB_USER"),
+#             "PASSWORD": env("DB_PASSWORD"),
+#             "HOST": env("DB_HOST"),
+#             "PORT": env("DB_PORT", default="5432"),
+#         }
+#     }
+# else:
+#     DATABASES = {
+#         "default": {
+#             "ENGINE": "django.db.backends.sqlite3",
+#             "NAME": BASE_DIR / "db.sqlite3",
+#         }
+#     }
+DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env("DB_NAME"),
+            "USER": env("DB_USER"),
+            "PASSWORD": env("DB_PASSWORD"),
+            "HOST": env("DB_HOST"),
+            "PORT": env("DB_PORT", default="5432"),
+        }
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
@@ -160,3 +180,9 @@ MAILERS = {
 CORS_ALLOW_ALL_ORIGINS = True
 
 AUTH_USER_MODEL = "users.User"
+
+AWS_REGION = env("AWS_REGION", default="us-east-1")
+S3_BUCKET = env("S3_BUCKET")
+SQS_IMAGE_PROCESSING_QUEUE_URL = env(
+    "SQS_IMAGE_PROCESSING_QUEUE_URL"
+)

@@ -27,9 +27,19 @@ variable "development_ip" {
   type        = string
 }
 
+variable "s3_bucket_name" {
+  type = string
+  default = "marketplace-products-947765363445"
+}
+
 variable "github_token" {
-  description = "Token do GitHub para o Worker clonar o repo"
+  description = "Token do GitHub"
   type        = string
   sensitive   = true
   default = ""
+}
+variable "github_user" {
+  description = "Usuario do GitHub"
+  type        = string
+  default     = "Joelio-Pinheiro"
 }

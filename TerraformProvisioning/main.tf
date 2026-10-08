@@ -32,6 +32,12 @@ module "security" {
   development_ip = var.development_ip
 }
 
+module "sns_sqs" {
+  source = "./SNS_SQS"
+
+  project_name = var.project_name
+}
+
 module "ec2_frontend" {
   source = "./EC2"
 
@@ -40,6 +46,13 @@ module "ec2_frontend" {
   instance_type     = "t3.micro"
   subnet_id         = module.network.public_subnet_ids[0]
   security_group_id = module.security.frontend_security_group_id
+
+  user_data = templatefile("${path.root}/UserData/frontend.sh", {
+    aws_region     = var.aws_region
+
+    github_user  = var.github_user
+    github_token = var.github_token
+  })
 }
 
 module "ec2_backend" {
@@ -51,9 +64,31 @@ module "ec2_backend" {
   subnet_id         = module.network.public_subnet_ids[1]
   security_group_id = module.security.backend_security_group_id
 
-  github_token = var.github_token
-}
+  user_data = templatefile("${path.root}/UserData/backend.sh", {
+    aws_region     = var.aws_region
 
+    github_user  = var.github_user
+    github_token = var.github_token
+  })
+}
+module "ec2_worker" {
+  source = "./EC2"
+
+  project_name     = var.project_name
+  role             = "worker"
+  instance_type    = "t3.micro"
+  subnet_id        = module.network.public_subnet_ids[0]
+  security_group_id = module.security.worker_security_group_id
+
+  user_data = templatefile("${path.root}/UserData/worker.sh", {
+    aws_region     = var.aws_region
+    sqs_queue_url  = module.sns_sqs.sqs_queue_url
+    s3_bucket_name = var.s3_bucket_name
+
+    github_user  = var.github_user
+    github_token = var.github_token
+  })
+}
 # module "s3" {
 #   source = "./S3"
 
@@ -74,12 +109,6 @@ module "rds" {
 
 module "dynamodb" {
   source = "./DynamoDB"
-
-  project_name = var.project_name
-}
-
-module "sns_sqs" {
-  source = "./SNS_SQS"
 
   project_name = var.project_name
 }

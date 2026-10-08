@@ -24,10 +24,16 @@ variable "security_group_id" {
   type        = string
 }
 
-variable "github_token" {
-  description = "Token do GitHub para o Worker clonar o repo"
+variable "user_data" {
+  description = "Script de inicialização da EC2"
   type        = string
-  sensitive   = true
-  default     = "" 
-
+  default     = null
 }
+
+# variable "github_token" {
+#   description = "Token do GitHub para o Worker clonar o repo"
+#   type        = string
+#   sensitive   = true
+#   default     = "" 
+
+# }

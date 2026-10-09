@@ -70,7 +70,8 @@ export async function criarProduto(produto, imagens = []) {
   const { data } = await axios.post(`${API_URL}/products/`, formData, {
     headers: {
       Authorization: `Bearer ${auth.token}`,
-      "Content-Type": "multipart/form-data",
+      
+      //"Content-Type": "multipart/form-data",
     },
   });
   return adaptarProduto(data);
@@ -98,7 +99,20 @@ export async function atualizarProduto(id, dados) {
     return null;
   }
   const auth = JSON.parse(localStorage.getItem("brecho_auth") || "{}");
-  const { data } = await axios.put(`${API_URL}/products/${id}/`, dados, {
+
+  const formData = new FormData();
+  formData.append("title", dados.title);
+  formData.append("description", dados.description);
+  formData.append("price", dados.price);
+  formData.append("category", dados.category);
+  formData.append("status", dados.status);
+
+  // Se vieram imagens novas, adiciona cada uma
+  if (dados.images && dados.images.length > 0) {
+    dados.images.forEach((img) => formData.append("images", img));
+  }
+  
+  const { data } = await axios.put(`${API_URL}/products/${id}/`, formData, {
     headers: {
       Authorization: `Bearer ${auth.token}`,
     },

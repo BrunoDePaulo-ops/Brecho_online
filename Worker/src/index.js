@@ -22,8 +22,9 @@ async function processarMensagem(mensagem) {
   
   // Sobe pro S3 (função do s3.js)
   console.log("Subindo pro S3...");
-  await subirParaS3(`produtos/${corpo.produto_id}/thumb_300.jpg`, thumb300);
-  await subirParaS3(`produtos/${corpo.produto_id}/thumb_600.jpg`, comMarca);
+  const pastaOriginal = corpo.s3_key.substring(0, corpo.s3_key.lastIndexOf("/"));
+  await subirParaS3(`${pastaOriginal}/thumb_300.jpg`, thumb300);
+  await subirParaS3(`${pastaOriginal}/thumb_600.jpg`, comMarca);
   console.log("Thumbnails salvas no S3");
   
   // Deleta do SQS (função do sqs.js)

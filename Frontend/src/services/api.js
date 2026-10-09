@@ -84,8 +84,12 @@ export async function excluirProduto(id) {
     if (index !== -1) produtosMock.splice(index, 1);
     return { sucesso: true };
   }
-  // const { data } = await axios.delete(`${API_URL}/products/${id}`);
-  // return data;
+  const auth = JSON.parse(localStorage.getItem("brecho_auth") || "{}");
+  const { data } = await axios.delete(`${API_URL}/products/${id}/`, {
+    headers: {
+      Authorization: `Bearer ${auth.token}`,
+    },
+  });
 }
 
 export async function atualizarProduto(id, dados) {
@@ -112,7 +116,7 @@ export async function atualizarProduto(id, dados) {
     dados.images.forEach((img) => formData.append("images", img));
   }
   
-  const { data } = await axios.put(`${API_URL}/products/${id}/`, formData, {
+  const { data } = await axios.patch(`${API_URL}/products/${id}/`, formData, {
     headers: {
       Authorization: `Bearer ${auth.token}`,
     },

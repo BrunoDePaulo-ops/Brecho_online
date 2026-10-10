@@ -17,5 +17,6 @@ export async function subirParaS3(chave, buffer) {
     Bucket: process.env.S3_BUCKET_NAME,
     Key: chave,
     Body: buffer,
+    ContentType: "image/jpeg",
   }));
 }

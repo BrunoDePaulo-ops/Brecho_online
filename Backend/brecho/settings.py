@@ -26,12 +26,15 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-qa=-+7s=o%f!exzr99$n+e1+u5mvt(*lnmw&631$9q19n_9d3c'
+SECRET_KEY = env("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env.bool("DEBUG", default=False)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env.list(
+    "ALLOWED_HOSTS",
+    default=["localhost", "127.0.0.1"],
+)
 
 
 # Application definition
@@ -186,3 +189,4 @@ S3_BUCKET = env("S3_BUCKET")
 SQS_IMAGE_PROCESSING_QUEUE_URL = env(
     "SQS_IMAGE_PROCESSING_QUEUE_URL"
 )
+DYNAMODB_TABLE = env("DYNAMODB_TABLE")

@@ -1,4 +1,7 @@
 .env
+.env.*
+!.env.example
+!.env.sample
 .terraform/
 *.tfstate
 *.tfstate.*
@@ -18,3 +21,16 @@ TerraformProvisioning/.terraform.lock.hcl
 Worker/mock/
 Worker/mock/
 mock/
+
+.aws/
+*.pem
+*.key
+*.p12
+*.pfx
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+*.tfplan
+*.sqlite3

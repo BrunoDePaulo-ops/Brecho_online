@@ -6,6 +6,77 @@ import { usuariosMock } from "../mocks/usuario";
 // com axios e apagar as que retornam mock. O resto do front NÃO muda.
 
 const API_URL = "http://localhost:8000/api"; // trocar depois pro IP da EC2
+
+// Instância Axios para requisições autenticadas
+const apiProtegida = axios.create();
+
+// Adiciona o token às requisições
+apiProtegida.interceptors.request.use((config) => {
+  const auth = JSON.parse(
+    localStorage.getItem("brecho_auth") || "{}"
+  );
+
+  if (auth.token) {
+    config.headers.Authorization = `Bearer ${auth.token}`;
+  }
+
+  return config;
+});
+
+// Renova o token quando ele expirar
+apiProtegida.interceptors.response.use(
+  (response) => response,
+
+  async (error) => {
+    const original = error.config;
+
+    const tokenExpirado =
+      error.response?.status === 401 &&
+      error.response?.data?.code === "token_not_valid";
+
+    if (!tokenExpirado || !original || original._retry) {
+      return Promise.reject(error);
+    }
+
+    original._retry = true;
+
+    const auth = JSON.parse(
+      localStorage.getItem("brecho_auth") || "{}"
+    );
+
+    if (!auth.refresh) {
+      return Promise.reject(error);
+    }
+
+    try {
+      const { data } = await axios.post(
+        `${API_URL}/token/refresh/`,
+        { refresh: auth.refresh }
+      );
+
+      const novaAuth = {
+        ...auth,
+        token: data.access,
+        refresh: data.refresh || auth.refresh,
+      };
+
+      localStorage.setItem(
+        "brecho_auth",
+        JSON.stringify(novaAuth)
+      );
+
+      original.headers.Authorization =
+        `Bearer ${novaAuth.token}`;
+
+      // Repete a requisição original
+      return apiProtegida(original);
+
+    } catch (refreshError) {
+      localStorage.removeItem("brecho_auth");
+      return Promise.reject(refreshError);
+    }
+  }
+);
 const USE_MOCK = false; // 👈 muda pra false quando o back existir
 
 // Simula delay de rede (pra ver os loadings funcionando)
@@ -22,7 +93,7 @@ function adaptarProduto(produto) {
     categoria: produto.category,
     vendedor: produto.seller,
     status: produto.status,
-    imagens: [`https://via.placeholder.com/600x400?text=${encodeURIComponent(produto.title)}`],
+    imagens: produto.image_urls || [],
   };
 }
 
@@ -54,7 +125,7 @@ export async function criarProduto(produto, imagens = []) {
     produtosMock.push(novo);
     return novo;
   }
-  const auth = JSON.parse(localStorage.getItem("brecho_auth") || "{}");
+
   const formData = new FormData();
   
   formData.append("title", produto.title);
@@ -67,13 +138,10 @@ export async function criarProduto(produto, imagens = []) {
     formData.append("images", img.arquivo);
   });
 
-  const { data } = await axios.post(`${API_URL}/products/`, formData, {
-    headers: {
-      Authorization: `Bearer ${auth.token}`,
-      
-      //"Content-Type": "multipart/form-data",
-    },
-  });
+  const { data } = await apiProtegida.post(
+    `${API_URL}/products/`,
+    formData
+  );
   return adaptarProduto(data);
 }
 
@@ -84,12 +152,11 @@ export async function excluirProduto(id) {
     if (index !== -1) produtosMock.splice(index, 1);
     return { sucesso: true };
   }
-  const auth = JSON.parse(localStorage.getItem("brecho_auth") || "{}");
-  const { data } = await axios.delete(`${API_URL}/products/${id}/`, {
-    headers: {
-      Authorization: `Bearer ${auth.token}`,
-    },
-  });
+  await apiProtegida.delete(
+  `${API_URL}/products/${id}/`
+  );
+
+  return {sucesso: true};
 }
 
 export async function atualizarProduto(id, dados) {
@@ -102,7 +169,6 @@ export async function atualizarProduto(id, dados) {
     }
     return null;
   }
-  const auth = JSON.parse(localStorage.getItem("brecho_auth") || "{}");
 
   const formData = new FormData();
   formData.append("title", dados.title);
@@ -116,11 +182,10 @@ export async function atualizarProduto(id, dados) {
     dados.images.forEach((img) => formData.append("images", img));
   }
   
-  const { data } = await axios.patch(`${API_URL}/products/${id}/`, formData, {
-    headers: {
-      Authorization: `Bearer ${auth.token}`,
-    },
-  });
+  const { data } = await apiProtegida.patch(
+    `${API_URL}/products/${id}/`,
+    formData
+  );
   return adaptarProduto(data);
 }
 
@@ -190,20 +255,14 @@ export async function login(email, senha) {
   }
 
   const { data } = await axios.post(`${API_URL}/token/`, {
-    username: email,
+    email: email.trim(),
     password: senha,
   });
-
-  const { data: usuarios } = await axios.get(`${API_URL}/users/`, {
-    headers: { Authorization: `Bearer ${data.access}` },
-  });
-
-  const usuario = usuarios.find((u) => u.username === email) || null;
-
-    return {
+  
+  return {
     token: data.access,
     refresh: data.refresh,
-    usuario,
+    usuario: data.usuario,
   };
 }
 

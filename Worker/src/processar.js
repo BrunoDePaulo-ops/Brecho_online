@@ -3,7 +3,8 @@ import sharp from "sharp";
 
 export async function redimensionar(buffer, largura) {
   return await sharp(buffer)
-    .resize(largura, largura, { fit: "inside" })
+    .resize(largura, largura, { fit: "inside", withoutEnlargement: true, })
+    .jpeg({quality: 85})
     .toBuffer();
 }
 

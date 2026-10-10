@@ -25,7 +25,7 @@ export default function MeusAnuncios() {
     try {
       await excluirProduto(id);
       setProdutos((prev) => prev.filter((p) => p.id !== id));
-      toast.success("Anúncio excluído! (mock)");
+      toast.success("Anúncio excluído!");
       setConfirmandoExclusao(null);
     } catch (erro) {
       toast.error("Erro ao excluir anúncio.");

@@ -289,3 +289,4 @@ Se der problema, chama no grupo do trabalho:
 
 - **Bruno** — front + worker
 - **Joélio** — backend + infra
+- **Rafael** — backend + testes

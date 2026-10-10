@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework.exceptions import AuthenticationFailed
 
 User = get_user_model()
 
@@ -47,3 +48,41 @@ class UserSerializer(serializers.ModelSerializer):
         instance.save()
 
         return instance
+
+class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
+    email = serializers.EmailField(write_only=True)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields.pop("username", None)
+
+    def validate(self, attrs):
+        User = get_user_model()
+
+        email = attrs["email"]
+        senha = attrs["password"]
+
+        usuario = User.objects.filter(
+            email__iexact=email
+        ).first()
+
+        if usuario is None:
+            raise AuthenticationFailed(
+                "E-mail ou senha inválidos."
+            )
+
+        # Valida as credenciais usando o username real.
+        data = super().validate({
+            "username": usuario.get_username(),
+            "password": senha,
+        })
+
+        # Retorna os dados básicos do usuário autenticado.
+        data["usuario"] = {
+            "id": usuario.id,
+            "username": usuario.username,
+            "nome": usuario.get_full_name() or usuario.username,
+            "email": usuario.email,
+        }
+
+        return data

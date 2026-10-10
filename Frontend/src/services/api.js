@@ -108,6 +108,23 @@ export async function listarProdutos() {
   return data.map(adaptarProduto);
 }
 
+export async function buscarHome() {
+  if (USE_MOCK) {
+    await delay(300);
+    return {
+      destaques: produtosMock.slice(0, 3),
+      maisProcurados: produtosMock.slice(0, 5),
+      todos: produtosMock,
+    };
+  }
+  const { data } = await axios.get(`${API_URL}/products/home/`);
+  return {
+    destaques: data.destaques.map(adaptarProduto),
+    maisProcurados: data.mais_procurados.map(adaptarProduto),
+    todos: data.todos.map(adaptarProduto),
+  };
+}
+
 export async function buscarProduto(id) {
   if (USE_MOCK) {
     await delay(300);

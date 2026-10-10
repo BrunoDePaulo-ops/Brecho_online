@@ -3,9 +3,7 @@ import { Flame, Star, Package, SearchX } from "lucide-react";
 import CardProduto from "../components/CardProduto";
 import Filtros from "../components/Filtros";
 import {
-  listarProdutos,
-  listarDestaques,
-  listarMaisProcurados,
+  buscarHome
 } from "../services/api";
 
 function Secao({ titulo, icone: Icone, cor, produtos }) {
@@ -41,20 +39,16 @@ export default function Home() {
   const [precoMax, setPrecoMax] = useState("");
 
   useEffect(() => {
-    async function carregar() {
-      setCarregando(true);
-      const [d, m, t] = await Promise.all([
-        listarDestaques(),
-        listarMaisProcurados(),
-        listarProdutos(),
-      ]);
-      setDestaques(d);
-      setMaisProcurados(m);
-      setTodos(t);
-      setCarregando(false);
-    }
-    carregar();
-  }, []);
+  async function carregar() {
+    setCarregando(true);
+    const { destaques, maisProcurados, todos } = await buscarHome();
+    setDestaques(destaques);
+    setMaisProcurados(maisProcurados);
+    setTodos(todos);
+    setCarregando(false);
+  }
+  carregar();
+}, []);
 
     // Aplica os filtros na lista de todos
   const produtosFiltrados = useMemo(() => {

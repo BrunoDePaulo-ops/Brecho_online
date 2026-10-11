@@ -27,64 +27,54 @@ module "network" {
 module "security" {
   source = "./Security"
 
-  project_name = var.project_name
-  vpc_id       = module.network.vpc_id
+  project_name   = var.project_name
+  vpc_id         = module.network.vpc_id
   development_ip = var.development_ip
 }
 
-module "sns_sqs" {
-  source = "./SNS_SQS"
+# module "sns_sqs" {
+#   source = "./SNS_SQS"
+#
+#   project_name = var.project_name
+# }
 
-  project_name = var.project_name
-}
+# module "ec2_frontend" {
+#   source = "./EC2"
+#
+#   project_name      = var.project_name
+#   role              = "frontend"
+#   instance_type     = "t3.micro"
+#   subnet_id         = module.network.public_subnet_ids[0]
+#   security_group_id = module.security.frontend_security_group_id
+#
+#   user_data = templatefile("${path.root}/UserData/frontend.sh", {
+#     aws_region     = var.aws_region
+# 
+#     github_user  = var.github_user
+#     github_token = var.github_token
+#   })
+# }
 
-module "ec2_frontend" {
-  source = "./EC2"
 
-  project_name      = var.project_name
-  role              = "frontend"
-  instance_type     = "t3.micro"
-  subnet_id         = module.network.public_subnet_ids[0]
-  security_group_id = module.security.frontend_security_group_id
+# module "ec2_worker" {
+#   source = "./EC2"
+# 
+#   project_name     = var.project_name
+#   role             = "worker"
+#   instance_type    = "t3.micro"
+#   subnet_id        = module.network.public_subnet_ids[0]
+#   security_group_id = module.security.worker_security_group_id
+# 
+#   user_data = templatefile("${path.root}/UserData/worker.sh", {
+#     aws_region     = var.aws_region
+#     sqs_queue_url  = module.sns_sqs.sqs_queue_url
+#     s3_bucket_name = var.s3_bucket_name
+# 
+#     github_user  = var.github_user
+#     github_token = var.github_token
+#   })
+# }
 
-  user_data = templatefile("${path.root}/UserData/frontend.sh", {
-    aws_region     = var.aws_region
-
-    github_user  = var.github_user
-    github_token = var.github_token
-  })
-}
-
-module "ec2_backend" {
-  source = "./EC2"
-
-  project_name      = var.project_name
-  role              = "backend"
-  instance_type     = "t3.micro"
-  subnet_id         = module.network.public_subnet_ids[1]
-  security_group_id = module.security.backend_security_group_id
-
-  user_data = null
-}
-
-module "ec2_worker" {
-  source = "./EC2"
-
-  project_name     = var.project_name
-  role             = "worker"
-  instance_type    = "t3.micro"
-  subnet_id        = module.network.public_subnet_ids[0]
-  security_group_id = module.security.worker_security_group_id
-
-  user_data = templatefile("${path.root}/UserData/worker.sh", {
-    aws_region     = var.aws_region
-    sqs_queue_url  = module.sns_sqs.sqs_queue_url
-    s3_bucket_name = var.s3_bucket_name
-
-    github_user  = var.github_user
-    github_token = var.github_token
-  })
-}
 # module "s3" {
 #   source = "./S3"
 
@@ -95,7 +85,7 @@ module "rds" {
   source = "./RDS"
 
   project_name      = var.project_name
-  subnet_ids        = module.network.private_subnet_ids 
+  subnet_ids        = module.network.private_subnet_ids
   security_group_id = module.security.rds_security_group_id
 
   db_name     = "marketplace"
@@ -103,16 +93,45 @@ module "rds" {
   db_password = var.db_password
 }
 
-module "dynamodb" {
-  source = "./DynamoDB"
-
-  project_name = var.project_name
-}
+# module "dynamodb" {
+#   source = "./DynamoDB"
+#
+#   project_name = var.project_name
+# }
 
 module "elasticache" {
   source = "./ElastiCache"
 
   project_name      = var.project_name
-  subnet_ids        = module.network.public_subnet_ids # TODO: Mudar para private_subnet_ids quando for para prod
+  subnet_ids        = module.network.private_subnet_ids
   security_group_id = module.security.elasticache_security_group_id
+}
+
+data "aws_sqs_queue" "image_processing" {
+  name = "${var.project_name}-image-processing"
+}
+
+module "autoscaling" {
+  source = "./AutoScaling"
+
+  project_name              = var.project_name
+  vpc_id                    = module.network.vpc_id
+  public_subnet_ids         = module.network.public_subnet_ids
+  alb_security_group_id     = module.security.alb_security_group_id
+  backend_security_group_id = module.security.backend_security_group_id
+
+  user_data = templatefile("${path.root}/UserData/backend.sh", {
+    aws_region     = var.aws_region
+    secret_key     = var.secret_key
+    db_host        = module.rds.endpoint_address
+    db_password    = var.db_password
+    s3_bucket      = var.s3_bucket_name
+    dynamodb_table = "${var.project_name}-audit"
+    sqs_queue_url  = data.aws_sqs_queue.image_processing.url
+    redis_host     = module.elasticache.primary_endpoint
+
+    github_user  = var.github_user
+    github_token = var.github_token
+    repo_branch  = var.backend_branch
+  })
 }

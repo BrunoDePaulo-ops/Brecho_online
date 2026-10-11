@@ -34,3 +34,5 @@ mock/
 *.tfvars.json
 *.tfplan
 *.sqlite3
+
+Backend/staticfiles/

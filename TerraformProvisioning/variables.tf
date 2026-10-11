@@ -28,7 +28,7 @@ variable "development_ip" {
 }
 
 variable "s3_bucket_name" {
-  type = string
+  type    = string
   default = "marketplace-products-947765363445"
 }
 
@@ -36,10 +36,20 @@ variable "github_token" {
   description = "Token do GitHub"
   type        = string
   sensitive   = true
-  default = ""
+  default     = ""
 }
 variable "github_user" {
   description = "Usuario do GitHub"
   type        = string
   default     = "Joelio-Pinheiro"
+}
+
+variable "secret_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "backend_branch" {
+  type    = string
+  default = "feat/integracao-autoscaling"
 }

@@ -6,7 +6,7 @@ exec > >(tee /var/log/userdata.log) 2>&1
 dnf install -y git python3.12 python3.12-pip python3.12-devel gcc libpq-devel
 
 # ============ 2. Clona o repositório ============
-git clone -b feat/provisioning https://${github_user}:${github_token}@github.com/BrunoDePaulo-ops/Brecho_online.git /app
+git clone -b "${repo_branch}" "https://${github_user}:${github_token}@github.com/BrunoDePaulo-ops/Brecho_online.git" /app
 
 # ============ 3. Virtualenv + dependências ============
 cd /app/Backend

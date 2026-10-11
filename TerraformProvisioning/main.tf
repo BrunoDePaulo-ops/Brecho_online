@@ -103,7 +103,7 @@ module "elasticache" {
   source = "./ElastiCache"
 
   project_name      = var.project_name
-  subnet_ids        = module.network.private_subnet_ids
+  subnet_ids        = module.network.public_subnet_ids
   security_group_id = module.security.elasticache_security_group_id
 }
 

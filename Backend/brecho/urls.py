@@ -16,6 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
+from django.http import HttpResponse
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularSwaggerView,
@@ -26,7 +27,11 @@ from rest_framework_simplejwt.views import (
 )
 from users.serializers import EmailTokenObtainPairSerializer
 
+def health(request):
+    return HttpResponse("ok", content_type="text/plain")
+
 urlpatterns = [
+    path("health/", health),
     path('admin/', admin.site.urls),
     
     path('api/', include('users.urls')),

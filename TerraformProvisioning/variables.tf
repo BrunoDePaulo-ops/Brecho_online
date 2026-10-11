@@ -22,13 +22,19 @@ variable "db_password" {
   sensitive   = true
 }
 
+variable "secret_key" {
+  description = "Chave secreta usada pelo Django"
+  type        = string
+  sensitive   = true
+}
+
 variable "development_ip" {
   description = "IP publico utilizado para desenvolvimento"
   type        = string
 }
 
 variable "s3_bucket_name" {
-  type = string
+  type    = string
   default = "marketplace-products-947765363445"
 }
 
@@ -36,7 +42,7 @@ variable "github_token" {
   description = "Token do GitHub"
   type        = string
   sensitive   = true
-  default = ""
+  default     = ""
 }
 variable "github_user" {
   description = "Usuario do GitHub"

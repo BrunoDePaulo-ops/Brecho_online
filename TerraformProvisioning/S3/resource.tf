@@ -1,5 +1,5 @@
 resource "aws_s3_bucket" "products" {
-  bucket = "${var.project_name}-products-947765363445"
+  bucket              = "${var.project_name}-products-947765363445"
   object_lock_enabled = false
   tags = {
     Name = "${var.project_name}-products"

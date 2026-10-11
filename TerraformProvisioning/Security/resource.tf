@@ -49,6 +49,25 @@ resource "aws_security_group" "elasticache" {
   }
 }
 
+resource "aws_security_group" "alb" {
+  name        = "${var.project_name}-alb-sg"
+  description = "Security Group do ALB"
+  vpc_id      = var.vpc_id
+
+  tags = { Name = "${var.project_name}-alb-sg" }
+}
+resource "aws_vpc_security_group_ingress_rule" "alb_http" {
+  security_group_id = aws_security_group.alb.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 80
+  to_port           = 80
+  ip_protocol       = "tcp"
+}
+resource "aws_vpc_security_group_egress_rule" "alb_all" {
+  security_group_id = aws_security_group.alb.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "-1"
+}
 
 # EC2 - Frontend + Backend
 resource "aws_vpc_security_group_ingress_rule" "frontend" {
@@ -62,8 +81,8 @@ resource "aws_vpc_security_group_ingress_rule" "frontend" {
 
 resource "aws_vpc_security_group_ingress_rule" "backend" {
   security_group_id = aws_security_group.backend.id
+  referenced_security_group_id = aws_security_group.alb.id
 
-  cidr_ipv4   = "0.0.0.0/0" # TODO: Restringir
   from_port   = 8080
   ip_protocol = "tcp"
   to_port     = 8080

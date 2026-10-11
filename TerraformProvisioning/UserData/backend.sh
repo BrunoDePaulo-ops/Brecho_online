@@ -6,7 +6,7 @@ exec > >(tee /var/log/userdata.log) 2>&1
 dnf install -y git python3.12 python3.12-pip python3.12-devel gcc libpq-devel
 
 # ============ 2. Clona o repositório ============
-git clone https://${github_user}:${github_token}@github.com/BrunoDePaulo-ops/Brecho_online.git /app
+git clone -b feat/provisioning https://${github_user}:${github_token}@github.com/BrunoDePaulo-ops/Brecho_online.git /app
 
 # ============ 3. Virtualenv + dependências ============
 cd /app/Backend
@@ -48,7 +48,7 @@ After=network.target
 [Service]
 WorkingDirectory=/app/Backend
 EnvironmentFile=/etc/app.env
-ExecStart=/app/.venv/bin/gunicorn brecho.wsgi:application --bind 0.0.0.0:8080 --workers 2
+ExecStart=/app/.venv/bin/gunicorn brecho.wsgi:application --bind 0.0.0.0:8080 --workers 2 --threads 4 --timeout 60 --keep-alive 75
 Restart=always
 
 [Install]

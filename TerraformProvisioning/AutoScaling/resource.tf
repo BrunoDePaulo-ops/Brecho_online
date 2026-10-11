@@ -1,3 +1,5 @@
+data "aws_region" "current" {}
+
 data "aws_ami" "amazon_linux" {
   most_recent = true
   owners      = ["amazon"]
@@ -67,10 +69,10 @@ resource "aws_lb_target_group" "backend" {
   health_check {
     path                = "/health/"
     matcher             = "200"
-    interval            = 15
-    timeout             = 5
+    interval            = 30
+    timeout             = 15
     healthy_threshold   = 2
-    unhealthy_threshold = 3
+    unhealthy_threshold = 5
   }
 }
 
@@ -101,7 +103,6 @@ resource "aws_autoscaling_group" "backend" {
     version = aws_launch_template.backend.latest_version
   }
 
-  # Troca as instâncias quando o Launch Template (UserData) mudar
   instance_refresh {
     strategy = "Rolling"
   }
@@ -115,6 +116,13 @@ resource "aws_autoscaling_group" "backend" {
   lifecycle {
     ignore_changes = [desired_capacity] # o ASG controla esse valor
   }
+
+  metrics_granularity = "1Minute"
+  enabled_metrics = [
+    "GroupDesiredCapacity",
+    "GroupInServiceInstances",
+    "GroupTotalInstances",
+  ]
 }
 
 # ---------- Políticas e alarmes ----------
@@ -160,4 +168,118 @@ resource "aws_cloudwatch_metric_alarm" "cpu_low" {
   comparison_operator = "LessThanThreshold"
   dimensions          = { AutoScalingGroupName = aws_autoscaling_group.backend.name }
   alarm_actions       = [aws_autoscaling_policy.scale_in.arn]
+}
+
+
+resource "aws_cloudwatch_dashboard" "main" {
+  dashboard_name = "${var.project_name}-elasticidade"
+
+  dashboard_body = jsonencode({
+    widgets = [
+      {
+        type = "metric", x = 0, y = 0, width = 12, height = 6
+        properties = {
+          title  = "CPU média do ASG (limiares 70% / 25%)"
+          region = data.aws_region.current.region
+          period = 60
+          stat   = "Average"
+          view   = "timeSeries"
+          metrics = [
+            ["AWS/EC2", "CPUUtilization", "AutoScalingGroupName", aws_autoscaling_group.backend.name]
+          ]
+          annotations = {
+            horizontal = [
+              { label = "Scale-out", value = 70 },
+              { label = "Scale-in", value = 25 }
+            ]
+          }
+          yAxis = { left = { min = 0, max = 100 } }
+        }
+      },
+      {
+        type = "metric", x = 12, y = 0, width = 12, height = 6
+        properties = {
+          title  = "Instâncias do ASG"
+          region = data.aws_region.current.region
+          period = 60
+          stat   = "Average"
+          view   = "timeSeries"
+          metrics = [
+            ["AWS/AutoScaling", "GroupInServiceInstances", "AutoScalingGroupName", aws_autoscaling_group.backend.name, { label = "InService" }],
+            [".", "GroupDesiredCapacity", ".", ".", { label = "Desejado" }]
+          ]
+          yAxis = { left = { min = 0, max = 4 } }
+        }
+      },
+      {
+        type = "metric", x = 0, y = 6, width = 12, height = 6
+        properties = {
+          title  = "Requisições por instância (balanceamento)"
+          region = data.aws_region.current.region
+          period = 60
+          stat   = "Sum"
+          view   = "timeSeries"
+          metrics = [
+            ["AWS/ApplicationELB", "RequestCountPerTarget",
+              "TargetGroup", aws_lb_target_group.backend.arn_suffix,
+            "LoadBalancer", aws_lb.main.arn_suffix]
+          ]
+        }
+      },
+      {
+        type = "metric", x = 12, y = 6, width = 12, height = 6
+        properties = {
+          title  = "Targets saudáveis x não saudáveis"
+          region = data.aws_region.current.region
+          period = 60
+          stat   = "Average"
+          view   = "timeSeries"
+          metrics = [
+            ["AWS/ApplicationELB", "HealthyHostCount",
+              "TargetGroup", aws_lb_target_group.backend.arn_suffix,
+              "LoadBalancer", aws_lb.main.arn_suffix, { label = "Healthy" }],
+            [".", "UnHealthyHostCount", ".", ".", ".", ".", { label = "Unhealthy" }]
+          ]
+        }
+      },
+      {
+        type = "metric", x = 0, y = 12, width = 12, height = 6
+        properties = {
+          title  = "Tempo de resposta (s)"
+          region = data.aws_region.current.region
+          period = 60
+          view   = "timeSeries"
+          metrics = [
+            ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", aws_lb.main.arn_suffix, { stat = "Average", label = "Média" }],
+            ["...", { stat = "p95", label = "p95" }]
+          ]
+        }
+      },
+      {
+        type = "metric", x = 12, y = 12, width = 12, height = 6
+        properties = {
+          title  = "Erros 5XX e total de requisições"
+          region = data.aws_region.current.region
+          period = 60
+          stat   = "Sum"
+          view   = "timeSeries"
+          metrics = [
+            ["AWS/ApplicationELB", "HTTPCode_Target_5XX_Count", "LoadBalancer", aws_lb.main.arn_suffix, { label = "5XX do backend" }],
+            [".", "HTTPCode_ELB_5XX_Count", ".", ".", { label = "5XX do ALB" }],
+            [".", "RequestCount", ".", ".", { label = "Total de requisições" }]
+          ]
+        }
+      },
+      {
+        type = "alarm", x = 0, y = 18, width = 24, height = 3
+        properties = {
+          title = "Estado dos alarmes"
+          alarms = [
+            aws_cloudwatch_metric_alarm.cpu_high.arn,
+            aws_cloudwatch_metric_alarm.cpu_low.arn
+          ]
+        }
+      }
+    ]
+  })
 }

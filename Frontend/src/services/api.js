@@ -5,7 +5,7 @@ import { usuariosMock } from "../mocks/usuario";
 // ⚠️ IMPORTANTE: Quando o back estiver pronto, é SÓ descomentar as linhas
 // com axios e apagar as que retornam mock. O resto do front NÃO muda.
 
-const API_URL = import.meta.env.API_URL || "http://localhost:8000/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
 
 // Instância Axios para requisições autenticadas

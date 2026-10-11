@@ -21,9 +21,9 @@ git clone https://${github_user}:${github_token}@github.com/BrunoDePaulo-ops/Bre
 cd /app/Frontend
 
 # URL base da API, disponível durante o build do Vite.
-# O nome API_URL deve corresponder ao utilizado pelo código React.
+# O nome VITE_API_URL deve corresponder ao utilizado pelo código React.
 cat > .env.production <<EOF
-API_URL=${api_url}
+VITE_API_URL=${api_url}
 EOF
 
 # ============ 5. Instala dependências ============

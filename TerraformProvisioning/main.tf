@@ -27,8 +27,8 @@ module "network" {
 module "security" {
   source = "./Security"
 
-  project_name = var.project_name
-  vpc_id       = module.network.vpc_id
+  project_name   = var.project_name
+  vpc_id         = module.network.vpc_id
   development_ip = var.development_ip
 }
 
@@ -36,6 +36,54 @@ module "sns_sqs" {
   source = "./SNS_SQS"
 
   project_name = var.project_name
+}
+
+# module "ec2_backend" {
+#   source = "./EC2"
+
+#   project_name      = var.project_name
+#   role              = "backend"
+#   instance_type     = "t3.micro"
+#   subnet_id         = module.network.public_subnet_ids[1]
+#   security_group_id = module.security.backend_security_group_id
+
+#   user_data = templatefile("${path.root}/UserData/backend.sh", {
+#     aws_region     = var.aws_region
+#     secret_key     = var.secret_key
+#     db_host        = module.rds.endpoint_address
+#     db_password    = var.db_password
+#     s3_bucket      = var.s3_bucket_name
+#     dynamodb_table = module.dynamodb.table_name
+#     sqs_queue_url  = module.sns_sqs.sqs_queue_url
+#     redis_host     = module.elasticache.primary_endpoint
+
+#     github_user  = var.github_user
+#     github_token = var.github_token
+#   })
+# }
+
+module "autoscaling" {
+  source = "./AutoScaling"
+
+  project_name              = var.project_name
+  vpc_id                    = module.network.vpc_id
+  public_subnet_ids         = module.network.public_subnet_ids
+  alb_security_group_id     = module.security.alb_security_group_id
+  backend_security_group_id = module.security.backend_security_group_id
+
+  user_data = templatefile("${path.root}/UserData/backend.sh", {
+    aws_region     = var.aws_region
+    secret_key     = var.secret_key
+    db_host        = module.rds.endpoint_address
+    db_password    = var.db_password
+    s3_bucket      = var.s3_bucket_name
+    dynamodb_table = module.dynamodb.table_name
+    sqs_queue_url  = module.sns_sqs.sqs_queue_url
+    redis_host     = module.elasticache.primary_endpoint
+
+    github_user    = var.github_user
+    github_token   = var.github_token
+  })
 }
 
 module "ec2_frontend" {
@@ -48,24 +96,9 @@ module "ec2_frontend" {
   security_group_id = module.security.frontend_security_group_id
 
   user_data = templatefile("${path.root}/UserData/frontend.sh", {
-    aws_region     = var.aws_region
+    aws_region = var.aws_region
 
-    github_user  = var.github_user
-    github_token = var.github_token
-  })
-}
-
-module "ec2_backend" {
-  source = "./EC2"
-
-  project_name      = var.project_name
-  role              = "backend"
-  instance_type     = "t3.micro"
-  subnet_id         = module.network.public_subnet_ids[1]
-  security_group_id = module.security.backend_security_group_id
-
-  user_data = templatefile("${path.root}/UserData/backend.sh", {
-    aws_region     = var.aws_region
+    api_url      = "http://${module.autoscaling.alb_dns_name}/api"
 
     github_user  = var.github_user
     github_token = var.github_token
@@ -74,10 +107,10 @@ module "ec2_backend" {
 module "ec2_worker" {
   source = "./EC2"
 
-  project_name     = var.project_name
-  role             = "worker"
-  instance_type    = "t3.micro"
-  subnet_id        = module.network.public_subnet_ids[0]
+  project_name      = var.project_name
+  role              = "worker"
+  instance_type     = "t3.micro"
+  subnet_id         = module.network.public_subnet_ids[0]
   security_group_id = module.security.worker_security_group_id
 
   user_data = templatefile("${path.root}/UserData/worker.sh", {

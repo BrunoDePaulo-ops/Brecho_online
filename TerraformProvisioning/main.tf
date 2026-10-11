@@ -64,13 +64,9 @@ module "ec2_backend" {
   subnet_id         = module.network.public_subnet_ids[1]
   security_group_id = module.security.backend_security_group_id
 
-  user_data = templatefile("${path.root}/UserData/backend.sh", {
-    aws_region     = var.aws_region
-
-    github_user  = var.github_user
-    github_token = var.github_token
-  })
+  user_data = null
 }
+
 module "ec2_worker" {
   source = "./EC2"
 
@@ -99,7 +95,7 @@ module "rds" {
   source = "./RDS"
 
   project_name      = var.project_name
-  subnet_ids        = module.network.public_subnet_ids # TODO: Mudar para private_subnet_ids quando for para prod
+  subnet_ids        = module.network.private_subnet_ids 
   security_group_id = module.security.rds_security_group_id
 
   db_name     = "marketplace"

@@ -29,4 +29,7 @@ resource "aws_elasticache_replication_group" "main" {
   tags = {
     Name = "${var.project_name}-redis"
   }
+
+  transit_encryption_enabled = true
+  at_rest_encryption_enabled = true
 }

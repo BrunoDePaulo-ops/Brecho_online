@@ -29,5 +29,4 @@ variable "db_password" {
   description = "Senha do usuario administrador"
   type        = string
   sensitive   = true
-  default = "123456789"
 }

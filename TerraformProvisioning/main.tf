@@ -1,3 +1,4 @@
+
 terraform {
   required_version = ">= 1.5.0"
 
@@ -13,6 +14,8 @@ provider "aws" {
   region = var.aws_region
 }
 
+# ========== REDE ==========
+
 module "network" {
   source = "./Network"
 
@@ -24,6 +27,9 @@ module "network" {
     "us-east-1b"
   ]
 }
+
+# ========== SEGURANÇA ==========
+
 module "security" {
   source = "./Security"
 
@@ -32,54 +38,13 @@ module "security" {
   development_ip = var.development_ip
 }
 
-# module "sns_sqs" {
-#   source = "./SNS_SQS"
-#
-#   project_name = var.project_name
-# }
+# ========== SERVIÇOS EXISTENTES ==========
 
-# module "ec2_frontend" {
-#   source = "./EC2"
-#
-#   project_name      = var.project_name
-#   role              = "frontend"
-#   instance_type     = "t3.micro"
-#   subnet_id         = module.network.public_subnet_ids[0]
-#   security_group_id = module.security.frontend_security_group_id
-#
-#   user_data = templatefile("${path.root}/UserData/frontend.sh", {
-#     aws_region     = var.aws_region
-# 
-#     github_user  = var.github_user
-#     github_token = var.github_token
-#   })
-# }
+data "aws_sqs_queue" "image_processing" {
+  name = "${var.project_name}-image-processing"
+}
 
-
-# module "ec2_worker" {
-#   source = "./EC2"
-# 
-#   project_name     = var.project_name
-#   role             = "worker"
-#   instance_type    = "t3.micro"
-#   subnet_id        = module.network.public_subnet_ids[0]
-#   security_group_id = module.security.worker_security_group_id
-# 
-#   user_data = templatefile("${path.root}/UserData/worker.sh", {
-#     aws_region     = var.aws_region
-#     sqs_queue_url  = module.sns_sqs.sqs_queue_url
-#     s3_bucket_name = var.s3_bucket_name
-# 
-#     github_user  = var.github_user
-#     github_token = var.github_token
-#   })
-# }
-
-# module "s3" {
-#   source = "./S3"
-
-#   project_name = var.project_name
-# }
+# ========== RDS ==========
 
 module "rds" {
   source = "./RDS"
@@ -93,11 +58,7 @@ module "rds" {
   db_password = var.db_password
 }
 
-# module "dynamodb" {
-#   source = "./DynamoDB"
-#
-#   project_name = var.project_name
-# }
+# ========== ELASTICACHE ==========
 
 module "elasticache" {
   source = "./ElastiCache"
@@ -107,9 +68,7 @@ module "elasticache" {
   security_group_id = module.security.elasticache_security_group_id
 }
 
-data "aws_sqs_queue" "image_processing" {
-  name = "${var.project_name}-image-processing"
-}
+# ========== AUTO SCALING DO BACKEND ==========
 
 module "autoscaling" {
   source = "./AutoScaling"
@@ -133,5 +92,47 @@ module "autoscaling" {
     github_user  = var.github_user
     github_token = var.github_token
     repo_branch  = var.backend_branch
+  })
+}
+
+# ========== FRONTEND ==========
+
+module "ec2_frontend" {
+  source = "./EC2"
+
+  project_name      = var.project_name
+  role              = "frontend"
+  instance_type     = "t3.micro"
+  subnet_id         = module.network.public_subnet_ids[0]
+  security_group_id = module.security.frontend_security_group_id
+
+  user_data = templatefile("${path.root}/UserData/frontend.sh", {
+    aws_region = var.aws_region
+
+    api_url = "http://${module.autoscaling.alb_dns_name}/api"
+
+    github_user  = var.github_user
+    github_token = var.github_token
+  })
+}
+
+# ========== WORKER ==========
+
+module "ec2_worker" {
+  source = "./EC2"
+
+  project_name      = var.project_name
+  role              = "worker"
+  instance_type     = "t3.micro"
+  subnet_id         = module.network.public_subnet_ids[0]
+  security_group_id = module.security.worker_security_group_id
+
+  user_data = templatefile("${path.root}/UserData/worker.sh", {
+    aws_region     = var.aws_region
+    sqs_queue_url  = data.aws_sqs_queue.image_processing.url
+    s3_bucket_name = var.s3_bucket_name
+
+    github_user  = var.github_user
+    github_token = var.github_token
   })
 }

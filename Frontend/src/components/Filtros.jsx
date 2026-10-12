@@ -1,17 +1,5 @@
-import { Search, X } from "lucide-react";
 
-const CATEGORIAS = [
-  "Todas",
-  "Decoração",
-  "Roupas",
-  "Móveis",
-  "Eletrônicos",
-  "Esportes",
-  "Livros",
-  "Instrumentos",
-  "Arte",
-  "Outros",
-];
+import { Search, X } from "lucide-react";
 
 export default function Filtros({
   busca,
@@ -23,6 +11,7 @@ export default function Filtros({
   precoMax,
   setPrecoMax,
   onLimpar,
+  categorias = [],
 }) {
   const temFiltroAtivo =
     busca || categoria !== "Todas" || precoMin || precoMax;
@@ -48,9 +37,11 @@ export default function Filtros({
           onChange={(e) => setCategoria(e.target.value)}
           className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
         >
-          {CATEGORIAS.map((cat) => (
-            <option key={cat} value={cat}>
-              {cat}
+          <option value="Todas">Todas</option>
+
+          {categorias.map((cat) => (
+            <option key={cat.id} value={cat.id}>
+              {cat.nome}
             </option>
           ))}
         </select>

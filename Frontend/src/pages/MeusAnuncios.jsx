@@ -44,6 +44,13 @@ export default function MeusAnuncios() {
       </div>
     );
   }
+  const ativos = produtos.filter(
+    (produto) => produto.status === "ACTIVE"
+  ).length;
+
+  const vendidos = produtos.filter(
+    (produto) => produto.status === "SOLD"
+  ).length;
 
   return (
     <main className="max-w-5xl mx-auto px-4 py-8">
@@ -60,9 +67,17 @@ export default function MeusAnuncios() {
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Meus anúncios</h1>
-          <p className="text-gray-500 mt-1">
+          {/* <p className="text-gray-500 mt-1">
             {produtos.length}{" "}
             {produtos.length === 1 ? "anúncio publicado" : "anúncios publicados"}
+          </p> */}
+          <p className="text-gray-500 mt-1">
+            {produtos.length}{" "}
+            {produtos.length === 1
+              ? "anúncio"
+              : "anúncios"}
+            {" · "}
+            {ativos} disponíveis · {vendidos} vendidos
           </p>
         </div>
         <Link
@@ -111,15 +126,43 @@ export default function MeusAnuncios() {
 
               {/* Info */}
               <div className="flex-1 min-w-0">
-                <span className="text-xs text-purple-600 font-medium">
-                  {produto.categoria}
-                </span>
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className="text-xs text-purple-600 font-medium">
+                    {produto.categoriaNome || produto.categoria}
+                  </span>
+
+                  <span
+                    className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                      produto.status === "SOLD"
+                        ? "bg-gray-100 text-gray-700"
+                        : produto.status === "ACTIVE"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-yellow-100 text-yellow-700"
+                    }`}
+                  >
+                    {produto.status === "SOLD"
+                      ? "Vendido"
+                      : produto.status === "ACTIVE"
+                        ? "Disponível"
+                        : produto.status}
+                  </span>
+                </div>
+
                 <h3 className="font-semibold text-gray-900 line-clamp-1">
                   {produto.titulo}
                 </h3>
+
                 <p className="text-sm text-gray-500 line-clamp-1">
                   {produto.descricao}
                 </p>
+
+                {produto.status === "SOLD" && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    <span className="font-medium">Comprador:</span>{" "}
+                    {produto.compradorNome || "Não registrado"}
+                  </p>
+                )}
+
                 <p className="text-lg font-bold text-gray-900 mt-1">
                   R$ {produto.preco.toFixed(2).replace(".", ",")}
                 </p>
@@ -127,13 +170,16 @@ export default function MeusAnuncios() {
 
               {/* Ações */}
               <div className="flex gap-2 flex-shrink-0">
-                <button
-                  onClick={() => handleEditar(produto.id)}
-                  className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
-                  title="Editar"
-                >
-                  <Pencil className="w-5 h-5" />
-                </button>
+                {produto.status === "ACTIVE" && (
+                  <button
+                    onClick={() => handleEditar(produto.id)}
+                    className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                    title="Editar"
+                  >
+                    <Pencil className="w-5 h-5" />
+                  </button>
+                )}
+
                 <button
                   onClick={() => setConfirmandoExclusao(produto.id)}
                   className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"

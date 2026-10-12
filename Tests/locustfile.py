@@ -2,7 +2,7 @@ from locust import HttpUser, task, between
 import random
 
 class Cliente(HttpUser):
-    wait_time = between(1, 3)
+    wait_time = between(0.1, 0.5)
 
     def on_start(self):
         r = self.client.get("/api/products/", name="/api/products/ (setup)")

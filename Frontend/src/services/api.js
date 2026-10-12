@@ -92,8 +92,10 @@ function adaptarProduto(produto) {
     descricao: produto.description,
     preco: parseFloat(produto.price),
     categoria: produto.category,
+    categoriaNome: produto.category_name,
     vendedor: produto.seller,
     status: produto.status,
+    compradorNome: produto.buyer_name ?? null,
     imagens: produto.image_urls || [],
   };
 }
@@ -216,11 +218,29 @@ export async function listarMeusProdutos() {
   // const { data } = await axios.get(`${API_URL}/meus-produtos`);
   // return data;
   //return await listarProdutos();
-  const produtos = await listarProdutos();
-  const auth = JSON.parse(localStorage.getItem("brecho_auth") || "{}");
-  const usuarioId = auth.usuario?.id;
-  if (!usuarioId) return [];
-  return produtos.filter((p) => p.vendedor === usuarioId);
+  // const produtos = await listarProdutos();
+  // const auth = JSON.parse(localStorage.getItem("brecho_auth") || "{}");
+  // const usuarioId = auth.usuario?.id;
+  // if (!usuarioId) return [];
+  // return produtos.filter((p) => p.vendedor === usuarioId);
+  const { data } = await apiProtegida.get(
+    `${API_URL}/products/`,
+    { params: { mine: "true" } }
+  );
+
+  const lista = Array.isArray(data)
+    ? data
+    : data.results ?? [];
+
+  return lista.map(adaptarProduto);
+}
+
+export async function comprarProduto(id) {
+  const { data } = await apiProtegida.post(
+    `${API_URL}/products/${id}/comprar/`
+  );
+
+  return data;
 }
 
 // ==================== VITRINE (com cache Redis no back) ====================
@@ -246,12 +266,18 @@ export async function listarMaisProcurados() {
 // ==================== CATEGORIAS ====================
 
 export async function listarCategorias() {
-  if (USE_MOCK) {
-    await delay(300);
-    return [];
-  }
+
   const { data } = await axios.get(`${API_URL}/categories/`);
-  return data;
+
+
+  const categorias = Array.isArray(data)
+    ? data
+    : data.results ?? [];
+
+  return categorias.map((categoria) => ({
+    id: categoria.id,
+    nome: categoria.name ?? categoria.nome ?? categoria.title,
+  }));
 }
 
 // ==================== AUTENTICAÇÃO ====================

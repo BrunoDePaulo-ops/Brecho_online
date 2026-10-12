@@ -3,7 +3,8 @@ import { Flame, Star, Package, SearchX } from "lucide-react";
 import CardProduto from "../components/CardProduto";
 import Filtros from "../components/Filtros";
 import {
-  buscarHome
+  buscarHome,
+  listarCategorias,
 } from "../services/api";
 
 function Secao({ titulo, icone: Icone, cor, produtos }) {
@@ -31,6 +32,7 @@ export default function Home() {
   const [maisProcurados, setMaisProcurados] = useState([]);
   const [todos, setTodos] = useState([]);
   const [carregando, setCarregando] = useState(true);
+  const [categorias, setCategorias] = useState([]);
 
   // Filtros
   const [busca, setBusca] = useState("");
@@ -50,6 +52,19 @@ export default function Home() {
   carregar();
 }, []);
 
+  useEffect(() => {
+  async function carregarCategorias() {
+    try {
+      const resultado = await listarCategorias();
+      setCategorias(resultado);
+    } catch (error) {
+      console.error("Erro ao carregar categorias:", error);
+    }
+  }
+
+  carregarCategorias();
+  }, []);
+
     // Aplica os filtros na lista de todos
   const produtosFiltrados = useMemo(() => {
     return todos.filter((p) => {
@@ -62,7 +77,7 @@ export default function Home() {
       }
 
       // Categoria
-      if (categoria !== "Todas" && p.categoria !== categoria) {
+      if (categoria !== "Todas" && String(p.categoria) !== String(categoria)) {
         return false;
       }
 
@@ -113,6 +128,7 @@ export default function Home() {
         precoMax={precoMax}
         setPrecoMax={setPrecoMax}
         onLimpar={limparFiltros}
+        categorias={categorias}
       />
 
       {/* Se tiver filtro ativo, esconde as seções de destaque/procurados */}

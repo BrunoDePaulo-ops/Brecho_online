@@ -15,7 +15,7 @@ npm --version
 
 # ============ 3. Clona o repositório ============
 # O token é injetado pelo Terraform via templatefile
-git clone https://${github_user}:${github_token}@github.com/BrunoDePaulo-ops/Brecho_online.git /app
+git clone https://github.com/BrunoDePaulo-ops/Brecho_online.git /app
 
 # ============ 4. Configura o Frontend ============
 cd /app/Frontend

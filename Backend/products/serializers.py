@@ -3,7 +3,7 @@ from rest_framework import serializers
 from .models import Category, Product, ProductImage
 from django.db import transaction
 from .services.queue import publish_image_processing_message
-from .services.storage import delete_product_image, upload_product_image
+from .services.storage import delete_product_image,get_s3_client, upload_product_image
 import boto3
 from django.conf import settings
 class CategorySerializer(serializers.ModelSerializer):
@@ -35,6 +35,36 @@ class ProductSerializer(serializers.ModelSerializer):
     )
     image_urls = serializers.SerializerMethodField()
     
+    category_name = serializers.CharField(
+        source="category.name",
+        read_only=True,
+    )
+    buyer_name = serializers.SerializerMethodField()
+    def get_buyer_name(self, obj):
+        request = self.context.get("request")
+
+        if (
+            not request
+            or not request.user.is_authenticated
+            or obj.seller_id != request.user.pk
+        ):
+            return None
+
+        if obj.buyer is None:
+            return None
+
+        get_full_name = getattr(obj.buyer, "get_full_name", None)
+
+        if callable(get_full_name):
+            nome = get_full_name().strip()
+            if nome:
+                return nome
+
+        return (
+            getattr(obj.buyer, "username", None)
+            or str(obj.buyer_id)
+        )
+    
     class Meta:
         model = Product
         fields = [
@@ -44,9 +74,11 @@ class ProductSerializer(serializers.ModelSerializer):
             "price",
             "seller",
             "category",
+            "category_name",
             "status",
             "images",
             "image_urls",
+            "buyer_name",
             "created_at",
             "updated_at",
         ]
@@ -58,19 +90,16 @@ class ProductSerializer(serializers.ModelSerializer):
         ]
 
     def get_image_urls(self, obj):
-        s3 = boto3.client(
-            "s3",
-            region_name=settings.AWS_REGION,
-    )
-
+        s3 = get_s3_client()
         urls = []
 
         for image in obj.images.all():
+            thumb_key = image.s3_key.replace("foto-original", "thumb_600")
             url = s3.generate_presigned_url(
                 ClientMethod="get_object",
                 Params={
                     "Bucket": settings.S3_BUCKET,
-                    "Key": image.s3_key,
+                    "Key": thumb_key,
                 },
                 ExpiresIn=3600,
             )

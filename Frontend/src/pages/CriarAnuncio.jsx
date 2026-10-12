@@ -208,7 +208,7 @@ export default function CriarAnuncio() {
               <option value="">Selecione...</option>
               {categorias.map((cat) => (
                 <option key={cat.id} value={cat.id}>
-                  {cat.name}
+                  {cat.nome}
                 </option>
               ))}
             </select>

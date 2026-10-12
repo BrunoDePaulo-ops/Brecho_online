@@ -8,10 +8,11 @@ dnf install -y git
 # ============ 2. Instala Node.js 20 ============
 curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
 dnf install -y nodejs
+dnf install -y fontconfig dejavu-sans-fonts
 
 # ============ 3. Clona o repositório ============
 # O token é injetado pelo Terraform via templatefile
-git clone https://${github_user}:${github_token}@github.com/BrunoDePaulo-ops/Brecho_online.git /app
+git clone https://github.com/BrunoDePaulo-ops/Brecho_online.git /app
 
 # ============ 4. Configura o Worker ============
 cd /app/Worker

@@ -1,9 +1,10 @@
 import logging
 from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework import viewsets
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from django_redis import get_redis_connection
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from .mixins import AuditoriaMixin
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from .permissions import IsOwnerOrReadOnly
 from .models import Category, Product
@@ -26,18 +27,106 @@ def dados_do_produto(produto):
         "images": list(
             produto.images.values_list("s3_key", flat=True)
         ),
+        "buyer_id": (
+            str(produto.buyer_id)
+            if produto.buyer_id is not None
+            else None
+        )
     }
 
-class CategoryViewSet(viewsets.ModelViewSet):
+CACHE_KEY_CATEGORIAS = "categorias:listagem"
+CACHE_TTL_CATEGORIAS = 60 * 30
+def dados_da_categoria(categoria):
+    return {"name": categoria.name}
+
+class CategoryViewSet(AuditoriaMixin, viewsets.ModelViewSet):
+    audit_entity = "Category"
     queryset = Category.objects.all().order_by("id")
     serializer_class = CategorySerializer
+
+    # READ - Listagem
+    def list(self, request, *args, **kwargs):
+        usa_cache = not request.query_params
+
+        if usa_cache:
+            cached = cache.get(CACHE_KEY_CATEGORIAS)
+            if cached is not None:
+                print(">>> CACHE HIT (Categories) <<<")
+                itens = cached.get("results", []) if isinstance(cached, dict) else cached
+                self._auditar("READ", "list", {
+                    "operation": "list",
+                    "source": "cache",
+                    "count": len(itens),
+                })
+                return Response(cached)
+            print(">>> CACHE MISS (Categories) <<<")
+        response = super().list(request, *args, **kwargs)
+
+        conteudo = response.data
+        itens = conteudo.get("results", []) if isinstance(conteudo, dict) else conteudo
+
+        self._auditar("READ", "list", {
+            "operation": "list",
+            "source": "database",
+            "category_ids": [str(c["id"]) for c in itens],
+            "count": len(itens),
+        })
+
+        if usa_cache:
+            cache.set(CACHE_KEY_CATEGORIAS, conteudo, CACHE_TTL_CATEGORIAS)
+
+        return response
+
+    # READ - Categoria individual
+    def retrieve(self, request, *args, **kwargs):
+        categoria = self.get_object()
+
+        self._auditar("READ", categoria.pk, {
+            "operation": "retrieve",
+            "category": dados_da_categoria(categoria),
+        })
+
+        return Response(self.get_serializer(categoria).data)
+
+    # CREATE
+    def perform_create(self, serializer):
+        categoria = serializer.save()
+        cache.delete(CACHE_KEY_CATEGORIAS)
+
+        self._auditar_apos_commit("CREATE", categoria.pk, {
+            "after": dados_da_categoria(categoria),
+        })
+
+    # UPDATE
+    def perform_update(self, serializer):
+        dados_anteriores = dados_da_categoria(serializer.instance)
+        categoria = serializer.save()
+        cache.delete(CACHE_KEY_CATEGORIAS)
+
+        self._auditar_apos_commit("UPDATE", categoria.pk, {
+            "before": dados_anteriores,
+            "after": dados_da_categoria(categoria),
+        })
+
+    # DELETE
+    def perform_destroy(self, instance):
+        categoria_id = instance.pk
+        dados_anteriores = dados_da_categoria(instance)
+
+        instance.delete()
+        cache.delete(CACHE_KEY_CATEGORIAS)
+
+        self._auditar_apos_commit("DELETE", categoria_id, {
+            "before": dados_anteriores,
+        })
 
 # Cache — chaves e TTL
 CACHE_KEY_PRODUTOS = "produtos:listagem"
 CACHE_TTL_PRODUTOS = 60 * 5   # 5 minutos
 
 
-class ProductViewSet(viewsets.ModelViewSet):
+class ProductViewSet(AuditoriaMixin, viewsets.ModelViewSet):
+    audit_entity = "Product"
     queryset = (
         Product.objects
         .select_related("seller", "category")
@@ -57,43 +146,24 @@ class ProductViewSet(viewsets.ModelViewSet):
         IsAuthenticatedOrReadOnly,
         IsOwnerOrReadOnly,
     ]
+    def _invalidar_caches_produtos(self):
+        cache.delete(CACHE_KEY_PRODUTOS)
+        cache.delete("home:dados")
+        cache.delete("produtos:mais_acessados")
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
 
-    def _auditar(self, action, entity_id, data):
-        """
-        Centraliza a gravação dos eventos no DynamoDB.
-        Uma falha de auditoria é registrada no log.
-        """
-        usuario = self.request.user
+        if self.action == "list":
+            if self.request.query_params.get("mine") == "true":
+                if not self.request.user.is_authenticated:
+                    return queryset.none()
 
-        actor_id = (
-            usuario.pk
-            if usuario.is_authenticated
-            else "anonymous"
-        )
+                return queryset.filter(seller=self.request.user)
 
-        try:
-            registrar_evento(
-                action=action,
-                entity="Product",
-                entity_id=entity_id,
-                actor_id=actor_id,
-                data=data,
-            )
-        except Exception:
-            logger.exception(
-                "Falha ao registrar auditoria: %s, produto=%s",
-                action,
-                entity_id,
-            )
+            return queryset.filter(status="ACTIVE")
 
-    def _auditar_apos_commit(self, action, entity_id, data):
-        """
-        Agenda a auditoria após a confirmação
-        da transação do PostgreSQL.
-        """
-        transaction.on_commit(
-            lambda: self._auditar(action, entity_id, data)
-        )
+        return queryset
 
     # CREATE
     def perform_create(self, serializer):
@@ -118,6 +188,12 @@ class ProductViewSet(viewsets.ModelViewSet):
             cached = cache.get(CACHE_KEY_PRODUTOS)
             if cached is not None:
                 logger.info("Cache HIT — listagem de produtos")
+                produtos = cached.get("results", []) if isinstance(cached, dict) else cached
+                self._auditar("READ", "list", {
+                    "operation": "list",
+                    "source": "cache",
+                    "count": len(produtos),
+                })
                 return Response(cached)
             logger.info("Cache MISS — buscando do banco")
 
@@ -188,6 +264,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 
         cache.delete(CACHE_KEY_PRODUTOS)
         cache.delete("home:dados") 
+        cache.delete("produtos:mais_acessados") 
 
         self._auditar_apos_commit(
             action="UPDATE",
@@ -240,7 +317,10 @@ class ProductViewSet(viewsets.ModelViewSet):
         if not top_ids:
             return Response([])
         
-        produtos = Product.objects.filter(pk__in=top_ids)
+        produtos = Product.objects.filter(
+            pk__in=top_ids,
+            status="ACTIVE",
+        )
         produtos_dict = {str(p.pk): p for p in produtos}
         produtos_ordenados = [produtos_dict[id] for id in top_ids if id in produtos_dict]
         
@@ -290,3 +370,52 @@ class ProductViewSet(viewsets.ModelViewSet):
 
         cache.set(CACHE_KEY, dados, CACHE_TTL)
         return Response(dados)
+
+    @action(detail=True, methods=["post"], url_path="comprar", permission_classes=[IsAuthenticated])
+    def comprar(self, request, *args, **kwargs):
+        with transaction.atomic():
+            produto_encontrado = self.get_object()
+
+            produto = Product.objects.select_for_update().get(
+                pk=produto_encontrado.pk
+            )
+
+            if produto.seller_id == request.user.pk:
+                return Response(
+                    {"detail": "Você não pode comprar seu próprio produto."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if produto.status != "ACTIVE":
+                return Response(
+                    {"detail": "Este produto não está mais disponível."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            dados_anteriores = dados_do_produto(produto)
+
+            produto.status = "SOLD"
+            produto.buyer = request.user
+            produto.save(update_fields=["status", "buyer", "updated_at"])
+
+            dados_novos = dados_do_produto(produto)
+            
+            transaction.on_commit(self._invalidar_caches_produtos)
+
+            self._auditar_apos_commit(
+                action="UPDATE",
+                entity_id=produto.pk,
+                data={
+                    "operation": "purchase",
+                    "before": dados_anteriores,
+                    "after": dados_novos,
+                },
+            )
+
+        return Response(
+            {
+                "detail": "Compra registrada. Produto marcado como vendido.",
+                "product": self.get_serializer(produto).data,
+            },
+            status=status.HTTP_200_OK,
+        )

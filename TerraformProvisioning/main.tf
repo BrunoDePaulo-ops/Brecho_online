@@ -38,30 +38,6 @@ module "sns_sqs" {
   project_name = var.project_name
 }
 
-# module "ec2_backend" {
-#   source = "./EC2"
-
-#   project_name      = var.project_name
-#   role              = "backend"
-#   instance_type     = "t3.micro"
-#   subnet_id         = module.network.public_subnet_ids[1]
-#   security_group_id = module.security.backend_security_group_id
-
-#   user_data = templatefile("${path.root}/UserData/backend.sh", {
-#     aws_region     = var.aws_region
-#     secret_key     = var.secret_key
-#     db_host        = module.rds.endpoint_address
-#     db_password    = var.db_password
-#     s3_bucket      = var.s3_bucket_name
-#     dynamodb_table = module.dynamodb.table_name
-#     sqs_queue_url  = module.sns_sqs.sqs_queue_url
-#     redis_host     = module.elasticache.primary_endpoint
-
-#     github_user  = var.github_user
-#     github_token = var.github_token
-#   })
-# }
-
 module "autoscaling" {
   source = "./AutoScaling"
 
@@ -81,8 +57,6 @@ module "autoscaling" {
     sqs_queue_url  = module.sns_sqs.sqs_queue_url
     redis_host     = module.elasticache.primary_endpoint
 
-    github_user    = var.github_user
-    github_token   = var.github_token
   })
 }
 
@@ -100,8 +74,6 @@ module "ec2_frontend" {
 
     api_url      = "http://${module.autoscaling.alb_dns_name}/api"
 
-    github_user  = var.github_user
-    github_token = var.github_token
   })
 }
 module "ec2_worker" {
@@ -118,8 +90,6 @@ module "ec2_worker" {
     sqs_queue_url  = module.sns_sqs.sqs_queue_url
     s3_bucket_name = var.s3_bucket_name
 
-    github_user  = var.github_user
-    github_token = var.github_token
   })
 }
 # module "s3" {

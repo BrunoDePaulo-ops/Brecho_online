@@ -10,11 +10,11 @@ class Cliente(HttpUser):
         items = data["results"] if isinstance(data, dict) and "results" in data else data
         self.ids = [p["id"] for p in items]
 
-    @task(5)
+    @task(1)
     def listar(self):
         self.client.get("/api/products/", name="/api/products/")
 
-    @task(2)
+    @task(5)
     def detalhe(self):
         if not self.ids:
             return

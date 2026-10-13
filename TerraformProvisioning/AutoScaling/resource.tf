@@ -25,12 +25,10 @@ resource "aws_launch_template" "backend" {
     name = "LabInstanceProfile"
   }
 
-  # Métricas de 1 minuto (necessário para alarmes com period = 60)
   monitoring {
     enabled = true
   }
 
-  # IP público é necessário: suas subnets são públicas e não há NAT
   network_interfaces {
     associate_public_ip_address = true
     security_groups             = [var.backend_security_group_id]
@@ -114,7 +112,7 @@ resource "aws_autoscaling_group" "backend" {
   }
 
   lifecycle {
-    ignore_changes = [desired_capacity] # o ASG controla esse valor
+    ignore_changes = [desired_capacity]
   }
 
   metrics_granularity = "1Minute"
@@ -150,7 +148,7 @@ resource "aws_cloudwatch_metric_alarm" "cpu_high" {
   metric_name         = "CPUUtilization"
   statistic           = "Average"
   period              = 60
-  evaluation_periods  = 2 # 2 amostras de 1 min = "mais de um minuto"
+  evaluation_periods  = 2 
   threshold           = 70
   comparison_operator = "GreaterThanThreshold"
   dimensions          = { AutoScalingGroupName = aws_autoscaling_group.backend.name }

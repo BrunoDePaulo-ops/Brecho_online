@@ -1,3 +1,4 @@
+
 services:
   valkey:
     image: valkey/valkey:8
@@ -8,5 +9,49 @@ services:
       - valkey_data:/data
     command: valkey-server --appendonly yes
 
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: brecho
+      POSTGRES_USER: brecho
+      POSTGRES_PASSWORD: 12345678
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  
+  backend:
+    build: ./Backend
+    image: brecho-backend
+    ports:
+      - "8000:8000"
+    environment:
+      SECRET_KEY: "1v7e-l&3&kz$$!vb@*tw5#^k%$$w&0uo-r#b3d3mk&@716h5$$@+n"
+      DEBUG: "True"
+      ALLOWED_HOSTS: "localhost,127.0.0.1"
+
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: brecho
+      DB_USER: brecho
+      DB_PASSWORD: "12345678"
+
+      S3_BUCKET: "temporario"
+      SQS_IMAGE_PROCESSING_QUEUE_URL: "temporario"
+      DYNAMODB_TABLE: "temporario"
+
+      REDIS_URL: redis://valkey:6379/1
+
+    depends_on:
+      - db
+
+  frontend:
+    build: ./Frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8000/api
+    depends_on:
+      - backend
+
 volumes:
+  postgres_data:
   valkey_data:

@@ -28,7 +28,11 @@ export default function MeusAnuncios() {
       toast.success("Anúncio excluído!");
       setConfirmandoExclusao(null);
     } catch (erro) {
-      toast.error("Erro ao excluir anúncio.");
+      toast.error(
+        Array.isArray(erro.response?.data?.detail)
+          ? erro.response.data.detail.join(" ")
+          : erro.response?.data?.detail || "Erro ao excluir anúncio."
+      );
     }
   }
 
@@ -180,13 +184,15 @@ export default function MeusAnuncios() {
                   </button>
                 )}
 
-                <button
-                  onClick={() => setConfirmandoExclusao(produto.id)}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                  title="Excluir"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
+                {produto.status !== "SOLD" && (
+                  <button
+                    onClick={() => setConfirmandoExclusao(produto.id)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                    title="Excluir"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                )}
               </div>
             </div>
           ))}

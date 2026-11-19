@@ -6,15 +6,23 @@ from django_redis import get_redis_connection
 from .mixins import AuditoriaMixin
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
+from rest_framework.exceptions import APIException
 from .permissions import IsOwnerOrReadOnly
 from .models import Category, Product
 from .serializers import CategorySerializer, ProductSerializer
+from .services.storage import delete_product_images
 
 from django.db import transaction
 from .services.audit import registrar_evento
 from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
+
+
+class SoldProductDeletionError(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_detail = "Produtos vendidos não podem ser excluídos."
+    default_code = "sold_product"
 
 def dados_do_produto(produto):
     return {
@@ -278,9 +286,15 @@ class ProductViewSet(AuditoriaMixin, viewsets.ModelViewSet):
     # DELETE
     def perform_destroy(self, instance):
         print(">>> PERFORM_DESTROY <<<")
+
+        if instance.status == Product.Status.SOLD:
+            raise SoldProductDeletionError()
+
         produto_id = instance.pk
         dados_anteriores = dados_do_produto(instance)
+        image_keys = list(instance.images.values_list("s3_key", flat=True))
 
+        delete_product_images(image_keys)
         instance.delete()
 
         cache.delete("home:dados")

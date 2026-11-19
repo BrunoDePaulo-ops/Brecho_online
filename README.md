@@ -13,16 +13,15 @@ React + Django + worker Node.js executados pelo Docker Compose. O PostgreSQL, o 
 
 ```mermaid
 flowchart LR
-    Browser[Navegador] --> Frontend[Frontend]
-    Browser --> Backend[Django]
-    Backend --> Postgres[(PostgreSQL)]
-    Backend --> Redis[(Redis)]
+    Frontend[Frontend] --> Backend[Backend Django]
+    Backend -->|dados permanentes| Postgres[(PostgreSQL)]
+    Backend <-->|cache e ranking| Redis[(Redis)]
     Backend --> MinIO[(MinIO)]
-    Backend --> RabbitMQ[RabbitMQ]
-    RabbitMQ --> Worker[Worker Node.js]
+    Backend -->|publica tarefas| RabbitMQ[RabbitMQ]
+    RabbitMQ -->|entrega mensagens| Worker[Worker Node.js]
     Worker --> MinIO
     Backend --> DynamoDB[(DynamoDB na AWS)]
-    Browser -->|URLs assinadas| MinIO
+    Frontend -->|URLs assinadas| MinIO
 ```
 
 ## Iniciar

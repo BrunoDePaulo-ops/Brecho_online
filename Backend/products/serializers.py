@@ -3,8 +3,7 @@ from rest_framework import serializers
 from .models import Category, Product, ProductImage
 from django.db import transaction
 from .services.queue import publish_image_processing_message
-from .services.storage import delete_product_image,get_s3_client, upload_product_image
-import boto3
+from .services.storage import get_s3_client, upload_product_image
 from django.conf import settings
 class CategorySerializer(serializers.ModelSerializer):
 
@@ -90,15 +89,15 @@ class ProductSerializer(serializers.ModelSerializer):
         ]
 
     def get_image_urls(self, obj):
-        s3 = get_s3_client()
+        s3 = get_s3_client(public=True)
         urls = []
 
         for image in obj.images.all():
-            thumb_key = image.s3_key.replace("foto-original", "thumb_600")
+            thumb_key = f"{image.s3_key.rsplit('/', 1)[0]}/thumb_600.jpg"
             url = s3.generate_presigned_url(
                 ClientMethod="get_object",
                 Params={
-                    "Bucket": settings.S3_BUCKET,
+                    "Bucket": settings.MINIO_BUCKET,
                     "Key": thumb_key,
                 },
                 ExpiresIn=3600,

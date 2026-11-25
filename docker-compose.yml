@@ -1,12 +1,165 @@
+x-minio-environment: &minio-environment
+  MINIO_ENDPOINT_URL: http://minio:9000
+  MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+  MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+  MINIO_BUCKET: ${MINIO_BUCKET:-brecho-products}
+  MINIO_REGION: ${MINIO_REGION:-us-east-1}
+
+x-rabbitmq-environment: &rabbitmq-environment
+  RABBITMQ_URL: amqp://${RABBITMQ_USER:-brecho}:${RABBITMQ_PASSWORD:-brecho}@rabbitmq:5672/%2F
+  RABBITMQ_IMAGE_QUEUE: ${RABBITMQ_IMAGE_QUEUE:-image-processing}
+
 services:
-  valkey:
-    image: valkey/valkey:8
-    container_name: marketplace-valkey
-    ports:
-      - "6379:6379"
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-marketplace}
+      POSTGRES_USER: ${POSTGRES_USER:-marketplace}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-marketplace-local}
     volumes:
-      - valkey_data:/data
-    command: valkey-server --appendonly yes
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  minio:
+    # Distribuição comunitária do MinIO mantida pelo Coolify; versão e digest fixos.
+    image: &minio-image coollabsio/minio:RELEASE.2025-10-15T17-29-55Z@sha256:69b55a1c1c5dc285ce04db96689f5b2102317fc77a50680a1874ca6efd1c87f9
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_SITE_REGION: ${MINIO_REGION:-us-east-1}
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "mc alias set health http://localhost:9000 \"$$MINIO_ROOT_USER\" \"$$MINIO_ROOT_PASSWORD\" >/dev/null && mc ready health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  minio-init:
+    image: *minio-image
+    environment: *minio-environment
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        mc alias set local "$$MINIO_ENDPOINT_URL" "$$MINIO_ACCESS_KEY" "$$MINIO_SECRET_KEY"
+        mc mb --ignore-existing "local/$$MINIO_BUCKET"
+        mc anonymous set none "local/$$MINIO_BUCKET"
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    hostname: rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-brecho}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-brecho}
+    ports:
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 20s
+
+  backend:
+    build: ./Backend
+    restart: unless-stopped
+    environment:
+      <<: [*minio-environment, *rabbitmq-environment]
+      SECRET_KEY: ${SECRET_KEY:-django-local-only-change-this-key-before-deploying-12345}
+      DEBUG: ${DEBUG:-False}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:8080,http://localhost:5173}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:8080}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${POSTGRES_DB:-marketplace}
+      DB_USER: ${POSTGRES_USER:-marketplace}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-marketplace-local}
+      REDIS_URL: redis://redis:6379/1
+      MINIO_PUBLIC_ENDPOINT_URL: ${MINIO_PUBLIC_ENDPOINT_URL:-http://localhost:9000}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_EC2_METADATA_DISABLED: "true"
+      DYNAMODB_TABLE: ${DYNAMODB_TABLE:-marketplace-audit}
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  worker:
+    build: ./Worker
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 60s
+    environment:
+      <<: [*minio-environment, *rabbitmq-environment]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
+  frontend:
+    build: ./Frontend
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:5173/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
 volumes:
-  valkey_data:
+  postgres_data:
+  minio_data:
+  rabbitmq_data:
+  redis_data:

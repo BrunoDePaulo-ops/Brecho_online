@@ -28,3 +28,4 @@ sqlparse==0.6.0
 typing_extensions==4.16.0
 uritemplate==4.2.0
 urllib3==2.8.0
+pika==1.3.2

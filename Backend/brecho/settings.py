@@ -102,27 +102,6 @@ TEMPLATES = [
 WSGI_APPLICATION = 'brecho.wsgi.application'
 
 
-# Database
-# DB_ENGINE = env("DB_ENGINE", default="sqlite")
-
-# if DB_ENGINE == "postgresql":
-#     DATABASES = {
-#         "default": {
-#             "ENGINE": "django.db.backends.postgresql",
-#             "NAME": env("DB_NAME"),
-#             "USER": env("DB_USER"),
-#             "PASSWORD": env("DB_PASSWORD"),
-#             "HOST": env("DB_HOST"),
-#             "PORT": env("DB_PORT", default="5432"),
-#         }
-#     }
-# else:
-#     DATABASES = {
-#         "default": {
-#             "ENGINE": "django.db.backends.sqlite3",
-#             "NAME": BASE_DIR / "db.sqlite3",
-#         }
-#     }
 DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
@@ -169,6 +148,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 
 # Email
@@ -180,16 +160,28 @@ MAILERS = {
     },
 }
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = env.list(
+    "CORS_ALLOWED_ORIGINS", default=["http://localhost:8080", "http://localhost:5173"]
+)
+CSRF_TRUSTED_ORIGINS = env.list(
+    "CSRF_TRUSTED_ORIGINS", default=["http://localhost:5173"]
+)
 
 AUTH_USER_MODEL = "users.User"
 
 AWS_REGION = env("AWS_REGION", default="us-east-1")
-S3_BUCKET = env("S3_BUCKET")
-SQS_IMAGE_PROCESSING_QUEUE_URL = env(
-    "SQS_IMAGE_PROCESSING_QUEUE_URL"
-)
-DYNAMODB_TABLE = env("DYNAMODB_TABLE")
+DYNAMODB_TABLE = env("DYNAMODB_TABLE", default="marketplace-audit")
+
+# Credenciais do MinIO independentes das credenciais AWS do DynamoDB.
+MINIO_ENDPOINT_URL = env("MINIO_ENDPOINT_URL", default="http://localhost:9000")
+MINIO_PUBLIC_ENDPOINT_URL = env("MINIO_PUBLIC_ENDPOINT_URL", default="http://localhost:9000")
+MINIO_ACCESS_KEY = env("MINIO_ACCESS_KEY", default="minioadmin")
+MINIO_SECRET_KEY = env("MINIO_SECRET_KEY", default="minioadmin")
+MINIO_BUCKET = env("MINIO_BUCKET", default="brecho-products")
+MINIO_REGION = env("MINIO_REGION", default="us-east-1")
+
+RABBITMQ_URL = env("RABBITMQ_URL", default="amqp://brecho:brecho@localhost:5672/%2F")
+RABBITMQ_IMAGE_QUEUE = env("RABBITMQ_IMAGE_QUEUE", default="image-processing")
 
 # Cache — Redis
 CACHES = {

@@ -1,5 +1,7 @@
 # Brechó Online com Docker
 
+Para executar no Kubernetes com Minikube, consulte o [guia do Kubernetes](./k8s/README.md).
+
 React + Django + worker Node.js executados pelo Docker Compose. O PostgreSQL, o MinIO, o RabbitMQ e o Redis rodam em contêineres locais. **O DynamoDB continua na AWS** para os registros de auditoria.
 
 | Componente anterior | Execução atual |

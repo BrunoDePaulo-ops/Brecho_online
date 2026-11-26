@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-init
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 180
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: minio-init
+          image: coollabsio/minio:RELEASE.2025-10-15T17-29-55Z@sha256:69b55a1c1c5dc285ce04db96689f5b2102317fc77a50680a1874ca6efd1c87f9
+          envFrom:
+            - secretRef:
+                name: minio-secret
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              until mc alias set local "http://minio:9000" \
+                "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" &&
+                mc ready local; do
+                echo "Aguardando o MinIO..."
+                sleep 5
+              done
+
+              mc mb --ignore-existing "local/$MINIO_BUCKET"
+              mc anonymous set none "local/$MINIO_BUCKET"

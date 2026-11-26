@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - postgres.yaml
+  - redis.yaml
+  - rabbitmq.yaml
+  - minIO.yaml
+  - minio-init.yaml
+  - backend.yaml
+  - frontend.yaml
+  - worker.yaml
+
+secretGenerator:
+  - name: postgres-secret
+    type: Opaque
+    envs:
+      - .env
+  - name: minio-secret
+    type: Opaque
+    envs:
+      - .env
+  - name: rabbitmq-secret
+    type: Opaque
+    envs:
+      - .env
+  - name: app-secret
+    type: Opaque
+    envs:
+      - .env

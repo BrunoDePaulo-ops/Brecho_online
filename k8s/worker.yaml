@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: worker
+          image: brecho-worker:v1
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: app-secret
+          env:
+            - name: MINIO_ACCESS_KEY
+              value: "$(MINIO_ROOT_USER)"
+            - name: MINIO_SECRET_KEY
+              value: "$(MINIO_ROOT_PASSWORD)"
+            - name: RABBITMQ_URL
+              value: "amqp://$(RABBITMQ_USER):$(RABBITMQ_PASSWORD)@rabbitmq:5672/%2F"

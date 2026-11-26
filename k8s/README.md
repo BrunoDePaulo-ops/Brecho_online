@@ -1,10 +1,10 @@
 # Brechó Online no Kubernetes
 
-Guia para uma demonstração local com Minikube e Docker. Todos os comandos abaixo
+Guia para executar o projeto localmente com Minikube e Docker. Todos os comandos abaixo
 partem da **raiz do repositório**, não desta pasta. O namespace usado é `default`
 e o perfil Minikube é `minikube`.
 
-## O que a demonstração mostra
+## Serviços
 
 | Componente | Recurso | Réplicas | Persistência |
 | --- | --- | --- | --- |
@@ -38,10 +38,6 @@ flowchart LR
     Worker --> Minio
     Browser -->|9000: imagens com URL assinada| Minio
 ```
-
-O desenho representa os destinos lógicos. O `port-forward` de um Service seleciona
-um Pod; para demonstrar o Service distribuindo conexões entre réplicas, use o
-acesso interno ao cluster descrito no roteiro abaixo.
 
 ## 1. Pré-requisitos e cluster
 
@@ -103,11 +99,11 @@ Mantenha `MINIO_REGION=us-east-1` enquanto o servidor em [minIO.yaml](./minIO.ya
 usar essa região. O frontend usa o servidor Vite de desenvolvimento, que recebe
 `VITE_API_URL` ao iniciar.
 
-Para demonstrar a auditoria, a tabela DynamoDB deve existir na região configurada,
+Para registrar a auditoria, a tabela DynamoDB deve existir na região configurada,
 ter chave de partição `id` do tipo String e permitir `dynamodb:PutItem` às
 credenciais fornecidas. Credenciais temporárias exigem também `AWS_SESSION_TOKEN`.
-Os manifestos não criam essa tabela. Sem credenciais válidas, a auditoria não é
-demonstrada; erros aparecem nos logs da aplicação.
+Os manifestos não criam essa tabela. Sem credenciais válidas, os eventos de auditoria
+não são gravados e erros aparecem nos logs da aplicação.
 
 ## 3. Construir e carregar as imagens corretas
 
@@ -136,7 +132,7 @@ garante que ela esteja disponível no runtime do Minikube.
 Para um banco novo, use a [configuração de bootstrap](../k8s-bootstrap/kustomization.yaml).
 Ela mantém os mesmos recursos e Secrets, mas inicia backend, frontend e worker
 com zero réplicas. Isso permite esperar os serviços antes de iniciar a aplicação.
-**Use esta etapa na preparação inicial: reaplicá-la em uma demonstração ativa
+**Use esta etapa na preparação inicial: reaplicá-la com a aplicação em execução
 desliga temporariamente os três Deployments.**
 
 ```bash
@@ -201,7 +197,7 @@ kubectl port-forward service/backend 8000:8000
 kubectl port-forward service/minio 9000:9000 9001:9001
 ```
 
-Opcional, para mostrar o painel da fila:
+Opcional, para acessar o painel do RabbitMQ:
 
 ```bash
 kubectl port-forward service/rabbitmq 15672:15672
@@ -223,7 +219,7 @@ nem download das imagens. Não use `http://backend:8000` como URL do navegador.
 Evite manter o Compose ocupando as mesmas portas. Se acessar por IP ou domínio,
 ajuste também URLs públicas, `ALLOWED_HOSTS`, CORS e CSRF.
 
-## 7. Preparar dados e ensaiar a apresentação
+## 7. Criar os dados iniciais
 
 Crie um administrador e ao menos uma categoria:
 
@@ -247,38 +243,6 @@ kubectl exec rabbitmq-0 -- rabbitmqctl list_queues -p / \
 Espere um consumidor em `image-processing` e nenhum em `image-processing.failed`.
 Uma fila vazia depois do processamento é normal. Mensagens na fila `.failed`
 indicam falha de processamento e não são tentadas novamente automaticamente.
-
-### Réplicas, Service e recuperação de Pod
-
-```bash
-kubectl get pods -l app=backend -o wide
-kubectl get endpointslices -l kubernetes.io/service-name=backend
-```
-
-Mostre os três Pods prontos e os três endereços disponíveis no Service. Para
-gerar conexões internas, execute pelo Pod do frontend:
-
-```bash
-kubectl exec deployment/frontend -- sh -c \
-  'for i in 1 2 3 4 5 6 7 8 9 10 11 12; do wget -qO- "http://backend:8000/health/?demo=$i"; echo; done'
-kubectl logs -l app=backend --prefix=true --tail=40 --max-log-requests=3
-```
-
-Procure as requisições `?demo=` nos logs com o nome dos Pods. A distribuição não
-precisa ser igual e conexões persistentes podem reutilizar um destino.
-O `port-forward service/backend` escolhe um Pod e não demonstra esse balanceamento.
-
-Para demonstrar recuperação, copie o nome de **um** Pod de backend e execute
-`kubectl delete pod NOME_DO_POD`. Depois acompanhe:
-
-```bash
-kubectl get pods -l app=backend -w
-```
-
-O Deployment deve repor o Pod e voltar a três réplicas. Use Ctrl+C para sair.
-Se o port-forward estava conectado ao Pod excluído, execute-o novamente.
-Os dados continuam no PostgreSQL e MinIO. Os três backends estão no mesmo nó
-Minikube: isso demonstra replicação, mas não tolerância à perda do nó.
 
 ## 8. Atualizar e reaplicar
 
@@ -328,4 +292,4 @@ kubectl get pods
 Espere os Pods ficarem prontos e reabra os port-forwards. Não precisa executar
 bootstrap em toda retomada. `minikube delete` remove o cluster e pode perder os
 dados locais. `kubectl delete -k k8s/` também inclui o PVC explícito do MinIO;
-não use esses comandos como forma de pausar a demonstração.
+não use esses comandos como forma de parar temporariamente o projeto.
